@@ -26,15 +26,24 @@ namespace SharpStrike
     public class FBO
     {
         public int ID;
+        private int _colorBufferID;
         private int _textureID;
+
+        private int _samples = 1;
 
         private int Width;
         private int Height;
 
         private bool _loaded;
 
-        public FBO()
+        private bool _renderBufferType;
+
+        public FBO(bool renderBufferType)
         {
+            _renderBufferType = renderBufferType;
+
+            CreateTexture();
+
             SetSize(Game.Instance.Width, Game.Instance.Height);
 
             _loaded = true;
@@ -93,12 +102,14 @@ namespace SharpStrike
             Create();
 
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, ID);
+            GL.BindTexture(TextureTarget.Texture2D, _textureID);
             GL.Viewport(0, 0, Width, Height);
         }
 
         public void BindDefault()
         {
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+            GL.BindTexture(TextureTarget.Texture2D, 0);
             GL.Viewport(0, 0, Game.Instance.Width, Game.Instance.Height);
         }
 
@@ -113,24 +124,7 @@ namespace SharpStrike
 
             GL.DrawBuffer(DrawBufferMode.ColorAttachment0);
 
-            _textureID = GL.GenTexture();
-            GL.BindTexture(TextureTarget.Texture2D, _textureID);
-            GL.TexImage2D(
-                TextureTarget.Texture2D,
-                0,
-                PixelInternalFormat.Rgba8,
-                Width,
-                Height /*here you'll want to give an internal size you set before you inited the fbo*/,
-                0,
-                PixelFormat.Rgba,
-                PixelType.UnsignedByte,
-                IntPtr.Zero);
-
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
-            GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, _textureID, 0);
+            CreateTexture();
 
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         }
@@ -144,6 +138,42 @@ namespace SharpStrike
             GL.DeleteTexture(_textureID);
 
             _loaded = false;
+        }
+
+        protected void CreateTexture()
+        {
+            if (_renderBufferType)
+            {
+                _colorBufferID = GL.GenRenderbuffer();
+                GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _colorBufferID);
+                if (_samples > 1) 
+                    GL.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples, RenderbufferStorage.Rgba8, Width, Height);
+                else 
+                    GL.RenderbufferStorage(RenderbufferTarget.Renderbuffer, RenderbufferStorage.Rgba8, Width, Height);
+                
+                GL.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, RenderbufferTarget.Renderbuffer, _colorBufferID);
+            }
+            else
+            {
+                _textureID = GL.GenTexture();
+                GL.BindTexture(TextureTarget.Texture2D, _textureID);
+                GL.TexImage2D(
+                    TextureTarget.Texture2D,
+                    0,
+                    PixelInternalFormat.Rgba8,
+                    Width,
+                    Height /*here you'll want to give an internal size you set before you inited the fbo*/,
+                    0,
+                    PixelFormat.Rgba,
+                    PixelType.UnsignedByte,
+                    IntPtr.Zero);
+
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+                GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, _textureID, 0);
+            }
         }
     }
 
@@ -277,8 +307,8 @@ namespace SharpStrike
 
             Map = new Map();
 
-            RenderShadowFbo = new FBO();
-            ShadowFbo = new FBO();
+            RenderShadowFbo = new FBO(true);
+            ShadowFbo = new FBO(false);
 
             FontRenderer.Init();
 
