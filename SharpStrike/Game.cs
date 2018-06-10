@@ -70,50 +70,73 @@ namespace SharpStrike
 
         public void RenderShadows(Vector2 viewingPos)
         {
+            GL.BindTexture(TextureTarget.Texture2D, 0);
+
+            GL.PushAttrib(AttribMask.ColorBufferBit);
+
+            GL.ClearColor(0, 0, 0, 0); //important
             Game.Instance.ShadowFbo.Bind();
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-            GL.ClearColor(0, 0, 0, 1f);
 
             GL.Color4(0, 0, 0, 1f);
             GL.Disable(EnableCap.Blend);
-            GL.BindTexture(TextureTarget.Texture2D, 0);
             GL.Begin(PrimitiveType.Quads);
-            for (var index = 0; index < _collisionBoxes.Count; index++)
+
+            var dist = (float)Math.Sqrt(Game.Instance.Width * Game.Instance.Width + Game.Instance.Height * Game.Instance.Height);
+            for (var i = 0; i < _collisionBoxes.Count; i++)
             {
-                var box = _collisionBoxes[index];
+                var box = _collisionBoxes[i];
 
-                var shadow = CreateShadowPolygon(viewingPos, box);
-
-                for (var i = 0; i < shadow.Count; i++)
+                for (var index = 0; index < 4; index++)
                 {
-                    var vec = shadow[i];
+                    //if last index, this is the first point
+                    var pointNext = box[index == 3 ? 0 : index + 1];
+                    var point = box[index];
 
-                    GL.Vertex2(vec);
+                    //sum of dat magic
+                    if (isLeft(pointNext, point, viewingPos))
+                    {
+                        GL.Vertex2(point);
+
+                        var dir = Vector2.Normalize(point - viewingPos);
+                        var projectedPoint = point + dir * dist;
+                        GL.Vertex2(projectedPoint);
+
+                        dir = Vector2.Normalize(pointNext - viewingPos);
+                        projectedPoint = pointNext + dir * dist;
+
+                        GL.Vertex2(projectedPoint);
+                        GL.Vertex2(pointNext);
+                    }
                 }
             }
+
             GL.End();
+            GL.PopAttrib();
             Game.Instance.ShadowFbo.Unbind();
             Game.Instance.ShadowFbo.BindTexture();
- 
+
             GL.Enable(EnableCap.Blend);
-            GL.Color4(1, 1, 1, 0.5f);
 
-            GL.Translate(0, Game.Instance.Height, 0);
-            GL.Scale(1, -1, -1);
-
-            GL.Scale(Game.Instance.Width, Game.Instance.Height, 1);
-            GL.Begin(PrimitiveType.Quads);
-            VertexUtil.PutQuad(false);
-            GL.End();
-            GL.Scale(1f / Game.Instance.Width, 1f / Game.Instance.Height, 1);
-
-            GL.Scale(1, -1, -1);
-            GL.Translate(0, -Game.Instance.Height, 0);
-
-            //Game.Instance.RenderShadowFbo.CopyColorTo(Game.Instance.ShadowFbo);
+            GL.Color4(1, 1, 1, 0.875f);
+            GL.Translate(Game.Instance.Width / 2f, Game.Instance.Height / 2f, 0);
+            GL.Scale(1, -1, 1);
+            RenderScreenQuad();
+            GL.Scale(1, -1, 1);
+            GL.Translate(-Game.Instance.Width / 2f, -Game.Instance.Height / 2f, 0);
         }
 
-        //TODO - merge with RenderShadow() for better performance
+        private void RenderScreenQuad()
+        {
+            GL.Scale(Game.Instance.Width, Game.Instance.Height, 1);
+            GL.Begin(PrimitiveType.Quads);
+            VertexUtil.PutQuad();
+            GL.End();
+            GL.Scale(1f / Game.Instance.Width, 1f / Game.Instance.Height, 1);
+        }
+
+        #region deprecated
+        /*
         private List<Vector2> CreateShadowPolygon(Vector2 viewer, AxisAlignedBB box)
         {
             List<Vector2> newShape = new List<Vector2>();
@@ -127,7 +150,7 @@ namespace SharpStrike
                 var point = box[index];
 
                 //sum of dat magic
-                if (isLeft(pointNext, point, viewer))
+                if (!isLeft(pointNext, point, viewer))
                 {
                     newShape.Add(point);
 
@@ -144,7 +167,8 @@ namespace SharpStrike
             }
 
             return newShape;
-        }
+        }*/
+        #endregion
 
         public bool isLeft(Vector2 a, Vector2 b, Vector2 c)
         {
@@ -175,8 +199,7 @@ namespace SharpStrike
             Instance = this;
 
             Map = new Map();
-
-            //RenderShadowFbo = new FBO(true);
+            
             ShadowFbo = new FBO(Width, Height);
 
             FontRenderer.Init();
@@ -206,19 +229,16 @@ namespace SharpStrike
                 return;
 
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-            GL.ClearColor(1f, 0, 0, 1);
+            GL.ClearColor(0.875f, 0.875f, 0.875f, 1f);
 
             var partialTicks = (float)(_updateTimer.Elapsed.TotalMilliseconds / (TargetUpdatePeriod * 1000));
 
             Player.Render(partialTicks);
 
             var vec = new Vector2(_lastMouse.X, _lastMouse.Y);
-
-            Map.Render(partialTicks);
             
-            //ShadownShader.Bind();
             Map.RenderShadows(vec);
-            //ShadownShader.Unbind();
+            Map.Render(partialTicks);
 
             SwapBuffers();
         }
