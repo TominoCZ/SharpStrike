@@ -1,7 +1,4 @@
-﻿using System;
-using System.Drawing;
-using OpenTK;
-using OpenTK.Graphics.OpenGL;
+﻿using OpenTK;
 
 namespace SharpStrike
 {
@@ -9,7 +6,6 @@ namespace SharpStrike
     {
         public EntityPlayer(float x, float y) : base(new Vector2(x, y))
         {
-
         }
 
         public void Render(float partialTicks)

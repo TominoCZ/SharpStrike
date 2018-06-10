@@ -22,12 +22,16 @@ namespace SharpStrike
                 {
                     case 0:
                         return min;
+
                     case 1:
                         return corner1;
+
                     case 2:
                         return max;
+
                     case 3:
                         return corner2;
+
                     default:
                         throw new IndexOutOfRangeException();
                 }
@@ -43,7 +47,7 @@ namespace SharpStrike
         }
 
         public AxisAlignedBB(Vector2 min, Vector2 max)
-        { 
+        {
             corner1 = new Vector2(max.X, min.Y);
             corner2 = new Vector2(min.X, max.Y);
 
@@ -58,7 +62,7 @@ namespace SharpStrike
 
             var v1 = new Vector2(minX, minY);
             var v2 = new Vector2(maxX, maxY);
-            
+
             size = v2 - v1;
         }
 

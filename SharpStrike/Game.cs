@@ -78,10 +78,11 @@ namespace SharpStrike
             Game.Instance.ShadowFbo.Bind();
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-            GL.Color4(0, 0, 0, 1f);
+            GL.Color4(0, 0, 0, 1f); //shadow color
             GL.Disable(EnableCap.Blend);
             GL.Begin(PrimitiveType.Quads);
 
+            //render shadows
             var dist = (float)Math.Sqrt(Game.Instance.Width * Game.Instance.Width + Game.Instance.Height * Game.Instance.Height);
             for (var i = 0; i < _collisionBoxes.Count; i++)
             {
@@ -136,6 +137,7 @@ namespace SharpStrike
         }
 
         #region deprecated
+
         /*
         private List<Vector2> CreateShadowPolygon(Vector2 viewer, AxisAlignedBB box)
         {
@@ -168,7 +170,8 @@ namespace SharpStrike
 
             return newShape;
         }*/
-        #endregion
+
+        #endregion deprecated
 
         public bool isLeft(Vector2 a, Vector2 b, Vector2 c)
         {
@@ -199,7 +202,7 @@ namespace SharpStrike
             Instance = this;
 
             Map = new Map();
-            
+
             ShadowFbo = new FBO(Width, Height);
 
             FontRenderer.Init();
@@ -236,9 +239,19 @@ namespace SharpStrike
             Player.Render(partialTicks);
 
             var vec = new Vector2(_lastMouse.X, _lastMouse.Y);
-            
+
             Map.RenderShadows(vec);
             Map.Render(partialTicks);
+
+            GL.Color3(1, 0.5f, 1);
+
+            GL.Translate(vec.X, vec.Y, 0);
+            GL.Scale(20, 20, 1);
+            GL.Begin(PrimitiveType.Polygon);
+            VertexUtil.PutCircle();
+            GL.End();
+            GL.Scale(1f / 20, 1f / 20, 1);
+            GL.Translate(-vec.X, -vec.Y, 0);
 
             SwapBuffers();
         }
@@ -348,7 +361,6 @@ namespace SharpStrike
         /*
         protected void BindAttributes()
         {
-
         }
 
         protected void BindAttribute(int attrib, string variable)

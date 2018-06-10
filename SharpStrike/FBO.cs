@@ -1,7 +1,5 @@
-﻿using System;
-using System.Runtime.InteropServices;
-using System.Windows.Forms.VisualStyles;
-using OpenTK.Graphics.OpenGL;
+﻿using OpenTK.Graphics.OpenGL;
+using System;
 
 namespace SharpStrike
 {

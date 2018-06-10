@@ -24,7 +24,7 @@ namespace SharpStrike
 
             return max;
         }
-        
+
         public static Vector4 Hue(int angle)
         {
             var rad = MathHelper.DegreesToRadians(angle);
