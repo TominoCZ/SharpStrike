@@ -7,7 +7,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Dynamic;
+using System.IO;
 using System.Linq;
+using System.Net;
+using System.Text;
+using FileDropEventArgs = OpenTK.Input.FileDropEventArgs;
 
 namespace SharpStrike
 {
@@ -19,160 +23,6 @@ namespace SharpStrike
             using (var g = new Game())
             {
                 g.Run(20, 60);
-            }
-        }
-    }
-
-    public class FBO
-    {
-        public int ID;
-        private int _colorBufferID;
-        private int _textureID;
-
-        private int _samples = 1;
-
-        private int Width;
-        private int Height;
-
-        private bool _loaded;
-
-        private bool _renderBufferType;
-
-        public FBO(bool renderBufferType)
-        {
-            _renderBufferType = renderBufferType;
-
-            CreateTexture();
-
-            SetSize(Game.Instance.Width, Game.Instance.Height);
-
-            _loaded = true;
-        }
-
-        public void CopyColorTo(FBO dest)
-        {
-            CopyTo(dest, ClearBufferMask.ColorBufferBit);
-        }
-
-        public void CopyTo(FBO dest, ClearBufferMask what)
-        {
-            CopyTo(dest, what, BlitFramebufferFilter.Nearest);
-        }
-
-        public void CopyTo(FBO dest, ClearBufferMask what, BlitFramebufferFilter how)
-        {
-            Create();
-            dest.Create();
-
-            GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, ID);
-            GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, dest.ID);
-            GL.BlitFramebuffer(0, 0, Width, Height, 0, 0, dest.Width, dest.Height, what, how);
-
-            dest.Bind();
-        }
-
-        public void CopyColorToScreen()
-        {
-            CopyToScreen(ClearBufferMask.ColorBufferBit);
-        }
-
-        public void CopyToScreen(ClearBufferMask what)
-        {
-            CopyToScreen(what, BlitFramebufferFilter.Nearest);
-        }
-
-        public void CopyToScreen(ClearBufferMask what, BlitFramebufferFilter how)
-        {
-            Create();
-
-            GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, ID);
-            GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, 0);
-            GL.BlitFramebuffer(0, 0, Width, Height, 0, 0, Game.Instance.Width, Game.Instance.Height, what, how);
-            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        }
-
-        public void SetSize(int w, int h)
-        {
-            Width = w;
-            Height = h;
-        }
-
-        public void Bind()
-        {
-            Create();
-
-            GL.BindFramebuffer(FramebufferTarget.Framebuffer, ID);
-            GL.BindTexture(TextureTarget.Texture2D, _textureID);
-            GL.Viewport(0, 0, Width, Height);
-        }
-
-        public void BindDefault()
-        {
-            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-            GL.BindTexture(TextureTarget.Texture2D, 0);
-            GL.Viewport(0, 0, Game.Instance.Width, Game.Instance.Height);
-        }
-
-        public void Create()
-        {
-            if (_loaded)
-                return;
-
-            _loaded = true;
-
-            ID = GL.GenFramebuffer();
-
-            GL.DrawBuffer(DrawBufferMode.ColorAttachment0);
-
-            CreateTexture();
-
-            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        }
-
-        public void Delete()
-        {
-            if (!_loaded)
-                return;
-
-            GL.DeleteFramebuffer(ID);
-            GL.DeleteTexture(_textureID);
-
-            _loaded = false;
-        }
-
-        protected void CreateTexture()
-        {
-            if (_renderBufferType)
-            {
-                _colorBufferID = GL.GenRenderbuffer();
-                GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _colorBufferID);
-                if (_samples > 1) 
-                    GL.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, _samples, RenderbufferStorage.Rgba8, Width, Height);
-                else 
-                    GL.RenderbufferStorage(RenderbufferTarget.Renderbuffer, RenderbufferStorage.Rgba8, Width, Height);
-                
-                GL.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, RenderbufferTarget.Renderbuffer, _colorBufferID);
-            }
-            else
-            {
-                _textureID = GL.GenTexture();
-                GL.BindTexture(TextureTarget.Texture2D, _textureID);
-                GL.TexImage2D(
-                    TextureTarget.Texture2D,
-                    0,
-                    PixelInternalFormat.Rgba8,
-                    Width,
-                    Height /*here you'll want to give an internal size you set before you inited the fbo*/,
-                    0,
-                    PixelFormat.Rgba,
-                    PixelType.UnsignedByte,
-                    IntPtr.Zero);
-
-                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
-                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
-                GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, _textureID, 0);
             }
         }
     }
@@ -224,9 +74,10 @@ namespace SharpStrike
 
         public void RenderShadows(Vector2 viewingPos, Vector2 somePoint)
         {
-            Game.Instance.RenderShadowFbo.Bind();
+            //Game.Instance.RenderShadowFbo.Bind();
 
-            GL.Color4(0, 0, 0, 0.45f);
+            //GL.Color4(0, 0, 0, 0.45f);
+            Game.Instance.ShadownShader.Bind();
             GL.BindTexture(TextureTarget.Texture2D, 0);
             GL.Begin(PrimitiveType.Quads);
             for (var index = 0; index < _collisionBoxes.Count; index++)
@@ -243,11 +94,13 @@ namespace SharpStrike
                 }
             }
             GL.End();
+            Game.Instance.ShadownShader.Unbind();
 
-            Game.Instance.ShadowFbo.Bind();
-            Game.Instance.RenderShadowFbo.CopyColorTo(Game.Instance.ShadowFbo);
+            //Game.Instance.ShadowFbo.Bind();
+            //Game.Instance.RenderShadowFbo.CopyColorTo(Game.Instance.ShadowFbo);
         }
 
+        //TODO - merge with RenderShadow() for better performance
         private List<Vector2> CreateShadowPolygon(Vector2 viewer, AxisAlignedBB box)
         {
             List<Vector2> newShape = new List<Vector2>();
@@ -290,9 +143,12 @@ namespace SharpStrike
     public class Game : GameWindow
     {
         public static Game Instance;
+
         private readonly Stopwatch _updateTimer = new Stopwatch();
         private readonly Random _rand = new Random();
         private Point _lastMouse;
+
+        public ShaderBase ShadownShader;
 
         public EntityPlayer Player;
 
@@ -307,12 +163,15 @@ namespace SharpStrike
 
             Map = new Map();
 
-            RenderShadowFbo = new FBO(true);
-            ShadowFbo = new FBO(false);
+            //RenderShadowFbo = new FBO(true);
+            //ShadowFbo = new FBO(false);
 
             FontRenderer.Init();
 
             Init();
+
+            Console.WriteLine(GL.GetError());
+            ShadownShader = new ShadowShader();
         }
 
         private void Init()
@@ -344,7 +203,10 @@ namespace SharpStrike
 
             Map.Render(partialTicks);
 
+            ShadownShader.Bind();
+            ShadownShader.SetFloat("alphaIn", 0.85f);
             Map.RenderShadows(vec, vec);
+            ShadownShader.Unbind();
 
             SwapBuffers();
         }
@@ -383,10 +245,11 @@ namespace SharpStrike
             GL.LoadIdentity();
             GL.Ortho(0, Width, Height, 0, 0, 1);
 
+            /*
             ShadowFbo.SetSize(Width, Height);
             RenderShadowFbo.SetSize(Width, Height);
 
-            /*
+            
             ShadowFbo.Delete();
             RenderShadowFbo.Delete();
 
@@ -394,6 +257,146 @@ namespace SharpStrike
             RenderShadowFbo = new FBO();*/
 
             OnRenderFrame(null);
+        }
+    }
+
+    class ShadowShader : ShaderBase
+    {
+        public ShadowShader() : base("shadow")
+        {
+            RegisterUniforms("alphaIn");
+        }
+    }
+
+    public abstract class ShaderBase
+    {
+        private int _vsh;
+        private int _fsh;
+
+        private int _program;
+        private string _shaderName;
+
+        private Dictionary<string, int> _uniforms = new Dictionary<string, int>();
+
+        protected ShaderBase(string shaderName)
+        {
+            _shaderName = shaderName;
+
+            LoadShader(shaderName);
+
+            //creates and ID for this program
+            _program = GL.CreateProgram();
+
+            //attaches shaders to this program
+            GL.AttachShader(_program, _vsh);
+            GL.AttachShader(_program, _fsh);
+
+            GL.LinkProgram(_program);
+            GL.ValidateProgram(_program);
+        }
+
+        private void LoadShader(string shaderName)
+        {
+            var path = $"assets\\shaders\\{shaderName}";
+
+            var codeVsh = File.ReadAllText(path + ".vsh");
+            var codeFsh = File.ReadAllText(path + ".fsh");
+
+            _vsh = GL.CreateShader(ShaderType.VertexShader);
+            _fsh = GL.CreateShader(ShaderType.FragmentShader);
+
+            GL.ShaderSource(_vsh, codeVsh);
+            GL.ShaderSource(_fsh, codeFsh);
+
+            GL.CompileShader(_vsh);
+            GL.CompileShader(_fsh);
+        }
+
+        private int GetUniformLocation(string uniform)
+        {
+            if (_uniforms.TryGetValue(uniform, out var loc))
+                return loc;
+
+            Console.WriteLine($"Attempted to access unknown uniform '{uniform}' in shader '{_shaderName}'");
+            return -1;
+        }
+
+        /*
+        protected void BindAttributes()
+        {
+
+        }
+
+        protected void BindAttribute(int attrib, string variable)
+        {
+            GL.BindAttribLocation(_program, attrib, variable);
+        }*/
+
+        protected void RegisterUniforms(params string[] uniforms)
+        {
+            Bind();
+            foreach (var uniform in uniforms)
+            {
+                if (_uniforms.ContainsKey(uniform))
+                {
+                    Console.WriteLine($"Attemted to register uniform '{uniform}' in shader '{_shaderName}' twice");
+                    continue;
+                }
+
+                var loc = GL.GetUniformLocation(_program, uniform);
+
+                if (loc == -1)
+                {
+                    Console.WriteLine($"Could not find uniform '{uniform}' in shader '{_shaderName}'");
+                    continue;
+                }
+
+                _uniforms.Add(uniform, loc);
+            }
+            Unbind();
+        }
+
+        public void SetFloat(string uniform, float f)
+        {
+            if (_uniforms.TryGetValue(uniform, out var loc))
+            {
+                GL.Uniform1(loc, f);
+            }
+            else
+            {
+                Console.WriteLine($"Attempted to set unknown uniform '{uniform}' in shader '{_shaderName}'");
+            }
+        }
+
+        public void SetVector2(string uniform, Vector2 vec)
+        {
+            var loc = GetUniformLocation(uniform);
+
+            if (loc != -1)
+                GL.Uniform2(loc, vec);
+        }
+
+        public void Bind()
+        {
+            GL.UseProgram(_program);
+        }
+
+        public void Unbind()
+        {
+            GL.UseProgram(0);
+        }
+
+        public void Destroy()
+        {
+            Unbind();
+
+            GL.DetachShader(_program, _vsh);
+            GL.DetachShader(_program, _fsh);
+
+            GL.DeleteShader(_vsh);
+            GL.DeleteShader(_fsh);
+
+            GL.DeleteProgram(_program);
         }
     }
 }
