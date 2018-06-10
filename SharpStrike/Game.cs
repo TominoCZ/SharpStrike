@@ -84,8 +84,6 @@ namespace SharpStrike
 
         public void SetSize(int w, int h)
         {
-            Delete();
-
             Width = w;
             Height = h;
         }
@@ -133,6 +131,8 @@ namespace SharpStrike
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
             GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, _textureID, 0);
+
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         }
 
         public void Delete()
@@ -159,15 +159,6 @@ namespace SharpStrike
             new AxisAlignedBB(400, 400, 450, 450),
             new AxisAlignedBB(600, 400, 650, 450)
         };
-
-        private FBO _renderShadowFbo;
-        private FBO _shadowFbo;
-
-        public Map()
-        {
-            _renderShadowFbo = new FBO();
-            _shadowFbo = new FBO();
-        }
 
         public List<AxisAlignedBB> GetCollidingBoxes(AxisAlignedBB box)
         {
@@ -201,15 +192,13 @@ namespace SharpStrike
             }
         }
 
-        public void RenderShadows(Vector2 viewingPos)
+        public void RenderShadows(Vector2 viewingPos, Vector2 somePoint)
         {
-            renderShadowFbo.Bind();
+            Game.Instance.RenderShadowFbo.Bind();
+
+            GL.Color4(0, 0, 0, 0.45f);
             GL.BindTexture(TextureTarget.Texture2D, 0);
-
             GL.Begin(PrimitiveType.Quads);
-            GL.Disable(EnableCap.Blend);
-            GL.Color4(0, 0, 0, 0.75f);
-
             for (var index = 0; index < _collisionBoxes.Count; index++)
             {
                 var box = _collisionBoxes[index];
@@ -223,12 +212,10 @@ namespace SharpStrike
                     GL.Vertex2(vec);
                 }
             }
-
             GL.End();
-            GL.Enable(EnableCap.Blend);
 
-            shadowFbo.Bind();
-            renderShadowFbo.CopyColorTo(shadowFbo);
+            Game.Instance.ShadowFbo.Bind();
+            Game.Instance.RenderShadowFbo.CopyColorTo(Game.Instance.ShadowFbo);
         }
 
         private List<Vector2> CreateShadowPolygon(Vector2 viewer, AxisAlignedBB box)
@@ -244,7 +231,7 @@ namespace SharpStrike
                 var point = box[index];
 
                 //sum of dat magic
-                if (!isLeft(pointNext, point, viewer))
+                if (isLeft(pointNext, point, viewer))
                 {
                     newShape.Add(point);
 
@@ -273,21 +260,25 @@ namespace SharpStrike
     public class Game : GameWindow
     {
         public static Game Instance;
-
         private readonly Stopwatch _updateTimer = new Stopwatch();
-
         private readonly Random _rand = new Random();
+        private Point _lastMouse;
 
         public EntityPlayer Player;
 
         public Map Map;
 
+        public FBO RenderShadowFbo;
+        public FBO ShadowFbo;
+
         public Game() : base(640, 480, new GraphicsMode(32, 24, 0, 8), "SharpStrike")
         {
-            //TODO
+            Instance = this;
+
             Map = new Map();
 
-            Instance = this;
+            RenderShadowFbo = new FBO();
+            ShadowFbo = new FBO();
 
             FontRenderer.Init();
 
@@ -319,12 +310,11 @@ namespace SharpStrike
 
             Player.Render(partialTicks);
 
-            var ms = Mouse.GetCursorState();
-            var point = PointToClient(new Point(ms.X, ms.Y));
-            var vec = new Vector2(point.X, point.Y);
+            var vec = new Vector2(_lastMouse.X, _lastMouse.Y);
 
             Map.Render(partialTicks);
-            Map.RenderShadows(vec);
+
+            Map.RenderShadows(vec, vec);
 
             SwapBuffers();
         }
@@ -348,8 +338,10 @@ namespace SharpStrike
 
         protected override void OnMouseMove(MouseMoveEventArgs e)
         {
-            if (!ClientRectangle.Contains(e.Position))
+            if (!ClientRectangle.Contains(e.Position) || !Focused)
                 return;
+
+            _lastMouse = e.Position;
         }
 
         protected override void OnResize(EventArgs e)
@@ -361,11 +353,16 @@ namespace SharpStrike
             GL.LoadIdentity();
             GL.Ortho(0, Width, Height, 0, 0, 1);
 
-            OnRenderFrame(null);
-        }
+            ShadowFbo.SetSize(Width, Height);
+            RenderShadowFbo.SetSize(Width, Height);
 
-        protected override void OnMove(EventArgs e)
-        {
+            /*
+            ShadowFbo.Delete();
+            RenderShadowFbo.Delete();
+
+            ShadowFbo = new FBO();
+            RenderShadowFbo = new FBO();*/
+
             OnRenderFrame(null);
         }
     }
