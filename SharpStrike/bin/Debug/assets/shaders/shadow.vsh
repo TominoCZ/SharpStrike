@@ -1,10 +1,5 @@
-#version 330
+﻿#version 330
 
-uniform float alphaIn;
-
-out float _alpha;
-
-void main(void)
-{
-	_alpha = alphaIn;
+void main(void){
+	gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
 }
