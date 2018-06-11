@@ -3,11 +3,15 @@ using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
-using System.IO;
 using System.Linq;
+using System.Net;
+using System.Threading;
+using System.Xml.Schema;
+using InvertedTomato.IO.Feather;
 
 namespace SharpStrike
 {
@@ -18,7 +22,7 @@ namespace SharpStrike
         {
             using (var g = new Game())
             {
-                g.Run(20, 60);
+                g.Run(60, 60);
             }
         }
     }
@@ -83,7 +87,8 @@ namespace SharpStrike
             GL.Begin(PrimitiveType.Quads);
 
             //render shadows
-            var dist = (float)Math.Sqrt(Game.Instance.Width * Game.Instance.Width + Game.Instance.Height * Game.Instance.Height);
+            var dist = (float)Math.Sqrt(Game.Instance.Width * Game.Instance.Width +
+                                         Game.Instance.Height * Game.Instance.Height);
             for (var i = 0; i < _collisionBoxes.Count; i++)
             {
                 var box = _collisionBoxes[i];
@@ -119,21 +124,17 @@ namespace SharpStrike
 
             GL.Enable(EnableCap.Blend);
 
-            GL.Color4(1, 1, 1, 0.875f);
-            GL.Translate(Game.Instance.Width / 2f, Game.Instance.Height / 2f, 0);
-            GL.Scale(1, -1, 1);
-            RenderScreenQuad();
-            GL.Scale(1, -1, 1);
-            GL.Translate(-Game.Instance.Width / 2f, -Game.Instance.Height / 2f, 0);
-        }
+            var w = Game.Instance.Width / 2f;
+            var h = Game.Instance.Height / 2f;
 
-        private void RenderScreenQuad()
-        {
-            GL.Scale(Game.Instance.Width, Game.Instance.Height, 1);
+            GL.Color4(1, 1, 1, 0.875f);
+            GL.Translate(w, h, 0);
+            GL.Scale(w * 2, -h * 2, 1);
             GL.Begin(PrimitiveType.Quads);
             VertexUtil.PutQuad();
             GL.End();
-            GL.Scale(1f / Game.Instance.Width, 1f / Game.Instance.Height, 1);
+            GL.Scale(1f / (w * 2), -1f / (h * 2), 1);
+            GL.Translate(-w, -h, 0);
         }
 
         #region deprecated
@@ -191,11 +192,15 @@ namespace SharpStrike
         public Shader ShadownShader;
 
         public EntityPlayer Player;
+        public EntityPlayer RemotePlayer;
 
         public Map Map;
 
         //public FBO RenderShadowFbo;
         public FBO ShadowFbo;
+
+        private ClientHandler _client;
+        private ServerHandler _server;
 
         public Game() : base(640, 480, new GraphicsMode(32, 24, 0, 8), "SharpStrike")
         {
@@ -211,6 +216,9 @@ namespace SharpStrike
 
             Console.WriteLine(GL.GetError());
             ShadownShader = new Shader("shadow");
+
+            _server = new ServerHandler();
+            _client = new ClientHandler();
         }
 
         private void Init()
@@ -223,7 +231,8 @@ namespace SharpStrike
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             GL.ActiveTexture(TextureUnit.Texture0);
 
-            Player = new EntityPlayer(50, 50);
+            RemotePlayer = new EntityPlayer(50, 50, 25, Color.Blue);
+            Player = new EntityPlayer(50, 50, 20, Color.Red);
         }
 
         protected override void OnRenderFrame(FrameEventArgs e)
@@ -236,28 +245,27 @@ namespace SharpStrike
 
             var partialTicks = (float)(_updateTimer.Elapsed.TotalMilliseconds / (TargetUpdatePeriod * 1000));
 
-            Player.Render(partialTicks);
-
             var vec = new Vector2(_lastMouse.X, _lastMouse.Y);
 
-            Map.RenderShadows(vec);
+            Map.RenderShadows(RemotePlayer.pos);
             Map.Render(partialTicks);
 
-            GL.Color3(1, 0.5f, 1);
+            RemotePlayer.Render(partialTicks);
 
-            GL.Translate(vec.X, vec.Y, 0);
-            GL.Scale(20, 20, 1);
-            GL.Begin(PrimitiveType.Polygon);
-            VertexUtil.PutCircle();
-            GL.End();
-            GL.Scale(1f / 20, 1f / 20, 1);
-            GL.Translate(-vec.X, -vec.Y, 0);
+            Player.TeleportTo(vec.X, vec.Y);
+            Player.Render(partialTicks);
 
             SwapBuffers();
         }
 
         protected override void OnUpdateFrame(FrameEventArgs e)
         {
+            if (!Visible)
+                return;
+
+            var vec = new Vector2(_lastMouse.X, _lastMouse.Y);
+            _client.Client.SendPos(vec);
+
             _updateTimer.Restart();
         }
 
@@ -290,149 +298,174 @@ namespace SharpStrike
             GL.LoadIdentity();
             GL.Ortho(0, Width, Height, 0, 0, 1);
 
-            //ShadowFbo.setSize();
+            ShadowFbo.SetSize(Width, Height);
             //RenderShadowFbo.SetSize(Width, Height);
 
-            ShadowFbo.Destroy();
+            //ShadowFbo.Destroy();
             //RenderShadowFbo.Delete();
 
-            ShadowFbo = new FBO(Width, Height);
+            // ShadowFbo = new FBO(Width, Height);
             // RenderShadowFbo = new FBO();*/
 
             OnRenderFrame(null);
         }
     }
 
-    public class Shader
+    class ServerHandler
     {
-        private int _vsh;
-        private int _fsh;
+        public static ConcurrentDictionary<EndPoint, Player> Connections = new ConcurrentDictionary<EndPoint, Player>();
 
-        private int _program;
-        private string _shaderName;
+        public FeatherTCP<Player> Server;
 
-        private Dictionary<string, int> _uniforms = new Dictionary<string, int>();
-
-        public Shader(string shaderName, params string[] uniforms)
+        public ServerHandler()
         {
-            _shaderName = shaderName;
+            Server = FeatherTCP<Player>.Listen(777);
 
-            LoadShader(shaderName);
+            Server.OnClientConnected += OnConnect;
 
-            //creates and ID for this program
-            _program = GL.CreateProgram();
-
-            //attaches shaders to this program
-            GL.AttachShader(_program, _vsh);
-            GL.AttachShader(_program, _fsh);
-
-            GL.LinkProgram(_program);
-            GL.ValidateProgram(_program);
-
-            RegisterUniforms(uniforms);
-        }
-
-        private void LoadShader(string shaderName)
-        {
-            var path = $"assets\\shaders\\{shaderName}";
-
-            var codeVsh = File.ReadAllText(path + ".vsh");
-            var codeFsh = File.ReadAllText(path + ".fsh");
-
-            _vsh = GL.CreateShader(ShaderType.VertexShader);
-            _fsh = GL.CreateShader(ShaderType.FragmentShader);
-
-            GL.ShaderSource(_vsh, codeVsh);
-            GL.ShaderSource(_fsh, codeFsh);
-
-            GL.CompileShader(_vsh);
-            GL.CompileShader(_fsh);
-        }
-
-        private int GetUniformLocation(string uniform)
-        {
-            if (_uniforms.TryGetValue(uniform, out var loc))
-                return loc;
-
-            Console.WriteLine($"Attempted to access unknown uniform '{uniform}' in shader '{_shaderName}'");
-            return -1;
-        }
-
-        /*
-        protected void BindAttributes()
-        {
-        }
-
-        protected void BindAttribute(int attrib, string variable)
-        {
-            GL.BindAttribLocation(_program, attrib, variable);
-        }*/
-
-        private void RegisterUniforms(params string[] uniforms)
-        {
-            Bind();
-            foreach (var uniform in uniforms)
+            ThreadPool.QueueUserWorkItem(state =>
             {
-                if (_uniforms.ContainsKey(uniform))
+                var time = TimeSpan.FromMilliseconds(1000 / 64.0);
+
+                while (!Server.IsDisposed)
                 {
-                    Console.WriteLine($"Attemted to register uniform '{uniform}' in shader '{_shaderName}' twice");
-                    continue;
+                    using (var payload = new PayloadWriter(1))
+                    {
+                        foreach (var player in Connections.Values)
+                        {
+                            payload
+                                .Append(player.ID)
+                                .Append(player.X.ToString())
+                                .Append(player.Y.ToString());
+                        }
+
+                        foreach (var player in Connections.Values)
+                        {
+                            player.SendPayload(payload);
+                        }
+                    }
+
+                    Thread.Sleep(time);
                 }
+            });
+        }
 
-                var loc = GL.GetUniformLocation(_program, uniform);
+        static void OnConnect(Player player)
+        {
+            // Get remote end point
+            var remoteEndPoint = player.RemoteEndPoint;
 
-                if (loc == -1)
+            // Add to list of current connections
+            Connections[remoteEndPoint] = player;
+            Console.WriteLine(remoteEndPoint + " has connected.");
+
+            player.SendID();
+
+            // Setup to remove from connections on disconnect
+            player.OnDisconnected += reason =>
+            {
+                Connections.TryRemove(remoteEndPoint, out player);
+                Console.WriteLine(remoteEndPoint + " has disconnected.");
+            };
+        }
+
+        public class Player : ConnectionBase
+        {
+            public float X;
+            public float Y;
+
+            public Guid ID { get; }
+
+            public Player()
+            {
+                ID = Guid.NewGuid();
+            }
+
+            public void SendID()
+            {
+                var payload = new PayloadWriter(0)
+                    .Append(ID);
+
+                // Send it to the client
+                Send(payload);
+            }
+
+            public void SendPayload(PayloadWriter w)
+            {
+                Send(w);
+            }
+
+            protected override void OnMessageReceived(PayloadReader payload)
+            {
+                // received from client
+                switch (payload.OpCode)
                 {
-                    Console.WriteLine($"Could not find uniform '{uniform}' in shader '{_shaderName}'");
-                    continue;
+                    case 1:
+                        //received pos
+
+                        X = float.Parse(payload.ReadString());
+                        Y = float.Parse(payload.ReadString());
+
+                        break;
                 }
-
-                _uniforms.Add(uniform, loc);
             }
-            Unbind();
+        }
+    }
+
+    class ClientHandler
+    {
+        public Connection Client;
+
+        public ClientHandler()
+        {
+            // Connect to server
+            Client = FeatherTCP<Connection>.Connect("localhost", 777);
         }
 
-        public void SetFloat(string uniform, float f)
+        public class Connection : ConnectionBase
         {
-            if (_uniforms.TryGetValue(uniform, out var loc))
+            private Guid _myID;
+
+            public void SendPos(Vector2 pos)
             {
-                GL.Uniform1(loc, f);
+                var payload = new PayloadWriter(1)
+                    .Append(pos.X.ToString())
+                    .Append(pos.Y.ToString());
+
+                // Send it to the server
+                Send(payload);
             }
-            else
+
+            protected override void OnMessageReceived(PayloadReader payload)
             {
-                Console.WriteLine($"Attempted to set unknown uniform '{uniform}' in shader '{_shaderName}'");
+                // Detect what type of message has arrived
+                switch (payload.OpCode)
+                {
+                    case 0:
+                        //received a Guid generated by server0
+                        _myID = payload.ReadGuid();
+                        break;
+                    case 1:
+                        //received a Guid generated by server0
+                        while (payload.Remaining > 0)
+                        {
+                            var id = payload.ReadGuid();
+                            var x = float.Parse(payload.ReadString());
+                            var y = float.Parse(payload.ReadString());
+
+                            if (id == _myID)
+                            {
+                                Game.Instance.RemotePlayer.TeleportTo(x, y);
+                            }
+                        }
+
+                        break;
+                    default:
+                        // Report that an unknown opcode arrived
+                        Console.WriteLine("Unknown message arrived with opcode " + payload.OpCode);
+                        break;
+                }
             }
-        }
-
-        public void SetVector2(string uniform, Vector2 vec)
-        {
-            var loc = GetUniformLocation(uniform);
-
-            if (loc != -1)
-                GL.Uniform2(loc, vec);
-        }
-
-        public void Bind()
-        {
-            GL.UseProgram(_program);
-        }
-
-        public void Unbind()
-        {
-            GL.UseProgram(0);
-        }
-
-        public void Destroy()
-        {
-            Unbind();
-
-            GL.DetachShader(_program, _vsh);
-            GL.DetachShader(_program, _fsh);
-
-            GL.DeleteShader(_vsh);
-            GL.DeleteShader(_fsh);
-
-            GL.DeleteProgram(_program);
         }
     }
 }

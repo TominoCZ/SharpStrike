@@ -83,8 +83,12 @@ namespace SharpStrike
 
         public void SetSize(int w, int h)
         {
+            Destroy();
+
             _width = w;
             _height = h;
+
+            Init();
         }
 
         public void BindTexture()

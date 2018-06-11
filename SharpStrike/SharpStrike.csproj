@@ -32,6 +32,12 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="InvertedTomato.Common, Version=1.0.6079.26494, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\InvertedTomato.Common.1.0.6079.26494\lib\net45\InvertedTomato.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="InvertedTomato.IO.Feather, Version=1.0.6117.18088, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\InvertedTomato.Feather.1.0.6117.18088\lib\net45\InvertedTomato.IO.Feather.dll</HintPath>
+    </Reference>
     <Reference Include="OpenTK, Version=3.0.0.0, Culture=neutral, PublicKeyToken=bad199fe84eb3df4, processorArchitecture=MSIL">
       <HintPath>..\packages\OpenTK.3.0.0\lib\net20\OpenTK.dll</HintPath>
     </Reference>
@@ -55,6 +61,7 @@
     <Compile Include="Game.cs" />
     <Compile Include="MathUtil.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Shader.cs" />
     <Compile Include="TextureManager.cs" />
     <Compile Include="EntityPlayer.cs" />
     <Compile Include="VertexUtil.cs" />
