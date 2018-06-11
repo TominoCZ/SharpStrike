@@ -1,5 +1,4 @@
 ﻿using System.Drawing;
-using System.Windows.Forms.VisualStyles;
 using OpenTK;
 using OpenTK.Graphics.OpenGL;
 
@@ -9,6 +8,8 @@ namespace SharpStrike
     {
         private float _size;
         private Color _color;
+
+        public Vector2 PartialPos => lastPos + (pos - lastPos) * Game.Instance.PartialTicks;
 
         public EntityPlayer(float x, float y, float size, Color color) : base(new Vector2(x, y))
         {

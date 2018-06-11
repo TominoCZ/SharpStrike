@@ -71,8 +71,6 @@ namespace SharpStrike
         {
             pos.X = x;
             pos.Y = y;
-
-            boundingBox = collisionBoundingBox.Offset(pos - Vector2.UnitX * collisionBoundingBox.size.X / 2 - Vector2.UnitY * collisionBoundingBox.size.Y / 2);
         }
 
         public void TeleportTo(float x, float y)
