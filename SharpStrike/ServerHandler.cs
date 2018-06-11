@@ -16,7 +16,7 @@ namespace SharpStrike
 
         private int _tickrate;
 
-        public ServerHandler(int tickRate = 64, int port = 45678)
+        public ServerHandler(int port, int tickRate = 64)
         {
             _tickrate = tickRate;
 
@@ -39,7 +39,7 @@ namespace SharpStrike
                         Thread.Sleep(time);
                     }
                 })
-                { IsBackground = true }.Start();
+            { IsBackground = true }.Start();
         }
 
         private void GameLoop()
@@ -61,14 +61,14 @@ namespace SharpStrike
             switch (e.Code)
             {
                 case "connect":
-                {
-                    var x = e.Data[0].ToSafeFloat();
-                    var y = e.Data[1].ToSafeFloat();
+                    {
+                        var x = e.Data[0].ToSafeFloat();
+                        var y = e.Data[1].ToSafeFloat();
 
-                    var player = _players.GetOrAdd(e.From, new PlayerDummy(x, y));
+                        var player = _players.GetOrAdd(e.From, new PlayerDummy(x, y));
 
-                    SendMessageTo(e.From, "init", player.ID.ToString(), _tickrate.ToString());
-                }
+                        SendMessageTo(e.From, "init", player.ID.ToString(), _tickrate.ToString());
+                    }
                     break;
 
                 case "playerPos":

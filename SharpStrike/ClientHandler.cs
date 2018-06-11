@@ -30,6 +30,9 @@ namespace SharpStrike
                 case "players":
                     var players = new List<Tuple<Guid, float, float>>();
 
+                    if (e.Data.Length == 0)
+                        break;
+
                     for (var index = 0; index < e.Data.Length; index += 3)
                     {
                         var id = Guid.Parse(e.Data[index]);

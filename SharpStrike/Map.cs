@@ -29,7 +29,7 @@ namespace SharpStrike
         {
             foreach (var player in _players.Values)
             {
-                player.Update();
+               player.Update();
             }
 
             foreach (var tuple in data)
