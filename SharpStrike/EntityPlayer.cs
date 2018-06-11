@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Drawing;
 using OpenTK;
 using OpenTK.Graphics.OpenGL;
 
@@ -25,6 +26,8 @@ namespace SharpStrike
             var partialPos = lastPos + (pos - lastPos) * partialTicks;
 
             GL.Color3(_color);
+
+            partialPos += Vector2.NormalizeFast(motion) * motion.LengthFast * 0.5f;
 
             GL.Translate(partialPos.X, partialPos.Y, 0);
             GL.Scale(_size, _size, 1);

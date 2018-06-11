@@ -75,11 +75,21 @@ namespace SharpStrike
 
             PartialTicks = (float)(_updateTimer.Elapsed.TotalMilliseconds / (TargetUpdatePeriod * 1000));
 
+            var pos = Player.PartialPos;
+
+            var pos2 = pos;
+            pos2.X -= Width / 2f;
+            pos2.Y -= Height / 2f;
+
+            GL.Translate(-pos2.X, -pos2.Y, 0);
+
             Map.RenderRemotePlayers();
-            Map.RenderShadows(Player.PartialPos);
+            Map.RenderShadows(pos);
             Map.Render(PartialTicks);
 
             Player.Render(PartialTicks);
+            
+            GL.Translate(pos2.X, pos2.Y, 0);
 
             SwapBuffers();
         }

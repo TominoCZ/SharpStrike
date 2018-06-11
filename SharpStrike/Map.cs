@@ -29,7 +29,7 @@ namespace SharpStrike
         {
             foreach (var player in _players.Values)
             {
-               player.Update();
+                player.Update();
             }
 
             foreach (var tuple in data)
@@ -138,18 +138,19 @@ namespace SharpStrike
 
             GL.Enable(EnableCap.Blend);
 
-            var w = Game.Instance.Width / 2f;
-            var h = Game.Instance.Height / 2f;
+            var w = Game.Instance.Width;
+            var h = Game.Instance.Height;
 
             GL.Color4(1, 1, 1, 0.875f);
-            GL.Translate(w, h, 0);
-            GL.Scale(w * 2, -h * 2, 1);
+
+            GL.Translate(viewingPos.X, viewingPos.Y, 0);
+            GL.Scale(w, -h, 1);
             GL.Begin(PrimitiveType.Quads);
             VertexUtil.PutQuad();
             GL.End();
-            GL.Scale(1f / (w * 2), -1f / (h * 2), 1);
-            GL.Translate(-w, -h, 0);
-            
+            GL.Scale(1f / w, -1f / h, 1);
+            GL.Translate(-viewingPos.X, -viewingPos.Y, 0);
+
             GL.BindTexture(TextureTarget.Texture2D, 0);
         }
 
