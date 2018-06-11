@@ -15,25 +15,18 @@ namespace SharpStrike
 
         public bool isAlive = true;
 
-        public float gravity = 1.875f;
-
         protected Entity(Vector2 pos)
         {
             this.pos = lastPos = pos;
-
-            collisionBoundingBox = AxisAlignedBB.BLOCK_FULL;
-            boundingBox = collisionBoundingBox.Offset(pos - (Vector2.UnitX * collisionBoundingBox.size.X / 2 + Vector2.UnitY * collisionBoundingBox.size.Y / 2));
         }
 
         public virtual void Update()
         {
             lastPos = pos;
 
-            motion.Y -= 0.04f * gravity;
-
             Move();
 
-            motion *= 0.8664021f;
+            motion *= 0.6664021f;
         }
 
         public virtual void Move()

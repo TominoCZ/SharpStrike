@@ -5,7 +5,6 @@ namespace SharpStrike
 {
     public class AxisAlignedBB
     {
-        public static readonly AxisAlignedBB BLOCK_FULL = new AxisAlignedBB(Vector2.Zero, Vector2.One);
         public static readonly AxisAlignedBB NULL = new AxisAlignedBB(Vector2.Zero, Vector2.Zero);
         public readonly Vector2 min;
         public readonly Vector2 max;

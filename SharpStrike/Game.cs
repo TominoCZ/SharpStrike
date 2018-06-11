@@ -29,22 +29,30 @@ namespace SharpStrike
 
     public class Map
     {
+        ConcurrentDictionary<Guid, EntityPlayer> _players = new ConcurrentDictionary<Guid, EntityPlayer>();
+
         private readonly List<AxisAlignedBB> _collisionBoxes = new List<AxisAlignedBB>
         {
-            new AxisAlignedBB(200, 200, 250, 250),
-            new AxisAlignedBB(400, 200, 450, 250),
-            new AxisAlignedBB(600, 200, 650, 250),
+            new AxisAlignedBB(100, 100, 150, 150),
+            new AxisAlignedBB(300, 100, 350, 150),
+            new AxisAlignedBB(500, 100, 550, 150),
 
-            new AxisAlignedBB(200, 400, 250, 450),
-            new AxisAlignedBB(400, 400, 450, 450),
-            new AxisAlignedBB(600, 400, 650, 450)
+            new AxisAlignedBB(100, 300, 150, 350),
+            new AxisAlignedBB(300, 300, 350, 350),
+            new AxisAlignedBB(500, 300, 550, 350)
         };
+
+        public void UpdatePlayerPosition(Guid ID, float x, float y)
+        {
+            var ep = _players.GetOrAdd(ID, new EntityPlayer(x, y, 20, Color.DodgerBlue));
+            ep.TeleportTo(x, y);
+        }
 
         public List<AxisAlignedBB> GetCollidingBoxes(AxisAlignedBB box)
         {
             var bb = box.Union(box);
 
-            return (List<AxisAlignedBB>)_collisionBoxes.Where(cb => cb.IntersectsWith(bb));
+            return _collisionBoxes.Where(cb => cb.IntersectsWith(bb)).ToList();
         }
 
         public void Render(float partialTicks)
@@ -72,8 +80,13 @@ namespace SharpStrike
             }
         }
 
-        public void RenderShadows(Vector2 viewingPos)
+        public void RenderShadows(Vector2 viewingPos, float partialTicks)
         {
+            foreach (var player in _players.Values)
+            {
+                player.Render(0);
+            }
+
             GL.BindTexture(TextureTarget.Texture2D, 0);
 
             GL.PushAttrib(AttribMask.ColorBufferBit);
@@ -192,7 +205,7 @@ namespace SharpStrike
         public Shader ShadownShader;
 
         public EntityPlayer Player;
-        public EntityPlayer RemotePlayer;
+        public EntityPlayer ServerPlayer;
 
         public Map Map;
 
@@ -217,7 +230,15 @@ namespace SharpStrike
             Console.WriteLine(GL.GetError());
             ShadownShader = new Shader("shadow");
 
-            _server = new ServerHandler();
+            try
+            {
+                _server = new ServerHandler();
+            }
+            catch
+            {
+
+            }
+
             _client = new ClientHandler();
         }
 
@@ -231,7 +252,7 @@ namespace SharpStrike
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             GL.ActiveTexture(TextureUnit.Texture0);
 
-            RemotePlayer = new EntityPlayer(50, 50, 25, Color.Blue);
+            ServerPlayer = new EntityPlayer(50, 50, 20, Color.DodgerBlue);
             Player = new EntityPlayer(50, 50, 20, Color.Red);
         }
 
@@ -245,14 +266,11 @@ namespace SharpStrike
 
             var partialTicks = (float)(_updateTimer.Elapsed.TotalMilliseconds / (TargetUpdatePeriod * 1000));
 
-            var vec = new Vector2(_lastMouse.X, _lastMouse.Y);
-
-            Map.RenderShadows(RemotePlayer.pos);
+            Map.RenderShadows(Player.pos, partialTicks);
             Map.Render(partialTicks);
 
-            RemotePlayer.Render(partialTicks);
-
-            Player.TeleportTo(vec.X, vec.Y);
+            ServerPlayer.Render(partialTicks);
+            
             Player.Render(partialTicks);
 
             SwapBuffers();
@@ -263,8 +281,41 @@ namespace SharpStrike
             if (!Visible)
                 return;
 
-            var vec = new Vector2(_lastMouse.X, _lastMouse.Y);
-            _client.Client.SendPos(vec);
+            if (Focused)
+            {
+                var state = Keyboard.GetState();
+
+                var dir = Vector2.Zero;
+
+                if (state.IsKeyDown(Key.W))
+                {
+                    dir.Y -= 1;
+                }
+                if (state.IsKeyDown(Key.S))
+                {
+                    dir.Y += 1;
+                }
+                if (state.IsKeyDown(Key.A))
+                {
+                    dir.X -= 1;
+                }
+                if (state.IsKeyDown(Key.D))
+                {
+                    dir.X += 1;
+                }
+
+                if (dir.Length > 0)
+                {
+                    dir.Normalize();
+                    dir *= 3;
+                    
+                    Player.motion = dir;
+                }
+
+                _client.Client.SendPos(Player.pos);
+            }
+            
+            Player.Update();
 
             _updateTimer.Restart();
         }
@@ -325,8 +376,6 @@ namespace SharpStrike
 
             ThreadPool.QueueUserWorkItem(state =>
             {
-                var time = TimeSpan.FromMilliseconds(1000 / 64.0);
-
                 while (!Server.IsDisposed)
                 {
                     using (var payload = new PayloadWriter(1))
@@ -345,7 +394,7 @@ namespace SharpStrike
                         }
                     }
 
-                    Thread.Sleep(time);
+                    Thread.Sleep(16);
                 }
             });
         }
@@ -442,11 +491,10 @@ namespace SharpStrike
                 switch (payload.OpCode)
                 {
                     case 0:
-                        //received a Guid generated by server0
+                        //received a Guid generated by server
                         _myID = payload.ReadGuid();
                         break;
                     case 1:
-                        //received a Guid generated by server0
                         while (payload.Remaining > 0)
                         {
                             var id = payload.ReadGuid();
@@ -455,8 +503,9 @@ namespace SharpStrike
 
                             if (id == _myID)
                             {
-                                Game.Instance.RemotePlayer.TeleportTo(x, y);
+                                Game.Instance.ServerPlayer.TeleportTo(x, y);
                             }
+                            else Game.Instance.Map.UpdatePlayerPosition(id, x, y);
                         }
 
                         break;
