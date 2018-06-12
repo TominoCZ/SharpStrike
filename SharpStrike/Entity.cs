@@ -18,6 +18,9 @@ namespace SharpStrike
         protected Entity(Vector2 pos)
         {
             this.pos = lastPos = pos;
+
+            boundingBox = AxisAlignedBB.NULL;
+            collisionBoundingBox = AxisAlignedBB.NULL;
         }
 
         public virtual void Update()

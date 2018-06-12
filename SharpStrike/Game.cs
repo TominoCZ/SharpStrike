@@ -3,6 +3,7 @@ using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 
@@ -12,10 +13,13 @@ namespace SharpStrike
     {
         public static Game Instance;
 
+        private List<EntityFX> _effects = new List<EntityFX>();
+
         private readonly Stopwatch _updateTimer = new Stopwatch();
 
         private readonly Random _rand = new Random();
-        private Point _lastMouse;
+
+        public Point MouseLast;
 
         public Shader ShadownShader;
 
@@ -45,6 +49,9 @@ namespace SharpStrike
 
             ShadownShader = new Shader("shadow");
 
+            //ip = "localhost";
+            //port = 25566;
+
             if (server)
                 _server = new ServerHandler(port);
 
@@ -65,6 +72,11 @@ namespace SharpStrike
             Player = new EntityPlayer(50, 50, 20, Color.Red);
         }
 
+        public void SpawnEffect(EntityFX efx)
+        {
+            _effects.Add(efx);
+        }
+
         protected override void OnRenderFrame(FrameEventArgs e)
         {
             if (!Visible)
@@ -83,12 +95,17 @@ namespace SharpStrike
 
             GL.Translate(-pos2.X, -pos2.Y, 0);
 
+            for (var index = 0; index < _effects.Count; index++)
+            {
+                _effects[index].Render(PartialTicks);
+            }
+
             Map.RenderRemotePlayers();
             Map.RenderShadows(pos);
             Map.Render(PartialTicks);
 
             Player.Render(PartialTicks);
-            
+
             GL.Translate(pos2.X, pos2.Y, 0);
 
             SwapBuffers();
@@ -138,6 +155,16 @@ namespace SharpStrike
 
             Player.Update();
 
+            for (var index = _effects.Count - 1; index >= 0; index--)
+            {
+                var effect = _effects[index];
+
+                effect.Update();
+
+                if (!effect.isAlive)
+                    _effects.Remove(effect);
+            }
+
             _updateTimer.Restart();
         }
 
@@ -145,12 +172,16 @@ namespace SharpStrike
         {
             if (!ClientRectangle.Contains(e.Position))
                 return;
+
+            Player.BeginShoot();
         }
 
         protected override void OnMouseUp(MouseButtonEventArgs e)
         {
             if (!ClientRectangle.Contains(e.Position))
                 return;
+
+            Player.StopShooting();
         }
 
         protected override void OnMouseMove(MouseMoveEventArgs e)
@@ -158,7 +189,7 @@ namespace SharpStrike
             if (!ClientRectangle.Contains(e.Position) || !Focused)
                 return;
 
-            _lastMouse = e.Position;
+            MouseLast = e.Position;
         }
 
         protected override void OnResize(EventArgs e)

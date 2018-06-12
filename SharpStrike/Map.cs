@@ -25,7 +25,7 @@ namespace SharpStrike
             new AxisAlignedBB(500, 300, 550, 350)
         };
 
-        public void SyncPlayerPositions(List<Tuple<Guid, float, float>> data)
+        public void SyncPlayers(List<Tuple<Guid, float, float, float>> data)
         {
             foreach (var player in _players.Values)
             {
@@ -39,6 +39,7 @@ namespace SharpStrike
 
                 var ep = _players.GetOrAdd(tuple.Item1, new EntityPlayerRemote(tuple.Item2, tuple.Item3, 20));
                 ep.MoveTo(tuple.Item2, tuple.Item3);
+                ep.Health = tuple.Item4;
             }
 
             _interpolationTimer.Restart();
@@ -195,6 +196,19 @@ namespace SharpStrike
         {
             var val = (c.X - a.X) * (b.Y - a.Y) - (c.Y - a.Y) * (b.X - a.X);
             return val > 0;
+        }
+
+        public Vector2 GetShotLandedPosition(Vector2 pos, Vector2 dir)
+        {
+            var lastDist = Single.MaxValue;
+
+            foreach (var box in _collisionBoxes)
+            {
+                if (RayHelper.Intersects(box, pos, dir, out var hit) && hit < lastDist)
+                    lastDist = hit;
+            }
+
+            return lastDist * dir;
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Drawing;
 using OpenTK;
 using OpenTK.Graphics.OpenGL;
 
@@ -7,6 +8,13 @@ namespace SharpStrike
     public class EntityPlayerRemote : Entity
     {
         private float _size;
+        private float _health = 100;
+
+        public float Health
+        {
+            get => _health;
+            set => _health = Math.Min(100, Math.Max(0, value));
+        }
 
         public EntityPlayerRemote(float x, float y, float size) : base(new Vector2(x, y))
         {
@@ -18,6 +26,8 @@ namespace SharpStrike
 
         public override void Update()
         {
+            isAlive = Health > 0;
+
             lastPos = pos;
         }
 
@@ -28,6 +38,9 @@ namespace SharpStrike
 
         public override void Render(float partialTicks)
         {
+            if (!isAlive)
+                return;
+
             var partialPos = lastPos + (pos - lastPos) * partialTicks;
             
             GL.Color4(Color.DodgerBlue);
