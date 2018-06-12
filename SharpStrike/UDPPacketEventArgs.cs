@@ -3,19 +3,13 @@ using System.Net;
 
 namespace SharpStrike
 {
-    public class UDPPacketEventArgs : EventArgs
+    public class UDPPacketEventArgs : PacketEventArgs
     {
         public IPEndPoint From { get; }
 
-        public string Code { get; }
-        public string[] Data { get; }
-
-        public UDPPacketEventArgs(IPEndPoint from, string code, string[] data)
+        public UDPPacketEventArgs(IPEndPoint @from, Guid senderID, string code, string[] data) : base(senderID, code, data)
         {
-            From = from;
-
-            Code = code;
-            Data = data;
+            From = @from;
         }
     }
 }

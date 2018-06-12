@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Linq;
-using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -9,27 +9,33 @@ using System.Threading.Tasks;
 
 namespace SharpStrike
 {
-    public class UDPWrapper
+    public class TCPClientWrapper
     {
-        private ConcurrentQueue<Tuple<IPEndPoint, string>> _messageQueue = new ConcurrentQueue<Tuple<IPEndPoint, string>>();
+        private ConcurrentQueue<string> _messageQueue = new ConcurrentQueue<string>();
 
-        private UdpClient _client;
+        private TcpClient _client;
 
-        public EventHandler<UDPPacketEventArgs> OnReceivedMessage;
+        public EventHandler<TCPPacketEventArgs> OnReceivedMessage;
 
-        public UDPWrapper(UdpClient client, int port)
+        public TCPClientWrapper(TcpClient client)
         {
             _client = client;
 
             Task.Run(() =>
             {
-                var from = new IPEndPoint(IPAddress.Any, port);
-
                 while (true)
                 {
-                    var data = _client.Receive(ref from);
+                    if (_client.Connected && _client.Available > 0)
+                    {
+                        using (var stream = _client.GetStream())
+                        {
+                            var data = new byte[_client.Available];
+                            stream.Read(data, 0, data.Length);
 
-                    _messageQueue.Enqueue(new Tuple<IPEndPoint, string>(from, Encoding.UTF8.GetString(data)));
+                            var msg = Encoding.UTF8.GetString(data);
+                            _messageQueue.Enqueue(msg);
+                        }
+                    }
                 }
             });
 
@@ -41,48 +47,36 @@ namespace SharpStrike
                         {
                             _messageQueue.TryDequeue(out var message);
 
-                            var split = message.Item2.Split('|');
+                            var split = message.Split('|');
                             for (int i = 0; i < split.Length; i++)
                                 split[i] = split[i].Replace("{p}", "|");
 
                             var code = split[0];
 
-                            var id = split[1];
+                            split = split.Skip(1).ToArray();
 
-                            split = split.Skip(2).ToArray();
-
-                            OnReceivedMessage?.Invoke(this, new UDPPacketEventArgs(message.Item1, Guid.Parse(id), code, split));
+                            OnReceivedMessage?.Invoke(this, new TCPPacketEventArgs(null, Guid.Empty, code, split));
                         }
                         else
                             Thread.Sleep(1);
                     }
                 })
-                { IsBackground = true }.Start();
+            { IsBackground = true }.Start();
         }
-
-        /// <summary>
-        /// This is used on the client to send data to server
-        /// </summary>
-        /// <param name="code"></param>
-        /// <param name="data"></param>
-        public void SendMessage(Guid sender, string code,  params string[] data)
-        {
-            var bytes = ParseMessage(sender, code, data);
-
-            _client.Send(bytes, bytes.Length);
-        }
-
         /// <summary>
         /// Used to send data to a specific IP address and port
         /// </summary>
         /// <param name="to"></param>
         /// <param name="code"></param>
         /// <param name="data"></param>
-        public void SendMessageTo(IPEndPoint to, Guid sender, string code, params string[] data)
+        public void SendMessage(Guid sender, string code, params string[] data)
         {
             var bytes = ParseMessage(sender, code, data);
 
-            _client.Send(bytes, bytes.Length, to);
+            using (var stream = _client.GetStream())
+            {
+                stream.Write(bytes, 0, bytes.Length);
+            }
         }
 
         private byte[] ParseMessage(Guid sender, string code, params string[] data)

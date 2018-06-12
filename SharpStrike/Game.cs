@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Net.Sockets;
 
 namespace SharpStrike
 {
@@ -49,14 +50,14 @@ namespace SharpStrike
 
             ShadownShader = new Shader("shadow");
 
-            //ip = "localhost";
-            //port = 25566;
+            ip = "localhost";
+            port = 25566;
 
             if (server)
                 _server = new ServerHandler(port);
 
             ClientHandler = new ClientHandler(ip, port);
-            ClientHandler.SendMessage("connect", Player.pos.X.ToSafeString(), Player.pos.Y.ToSafeString());
+            //ClientHandler.SendMessage(ProtocolType.Tcp, "connect", Player.pos.X.ToSafeString(), Player.pos.Y.ToSafeString());
         }
 
         private void Init()
@@ -150,7 +151,7 @@ namespace SharpStrike
                     Player.motion = dir * _tickrateRatio;
                 }
 
-                ClientHandler.SendMessage("playerPos", Player.pos.X.ToSafeString(), Player.pos.Y.ToSafeString());
+                ClientHandler.SendMessage(ProtocolType.Udp, "playerPos", Player.pos.X.ToSafeString(), Player.pos.Y.ToSafeString());
             }
 
             Player.Update();

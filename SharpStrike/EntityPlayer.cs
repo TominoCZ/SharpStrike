@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using OpenTK;
@@ -83,61 +84,9 @@ namespace SharpStrike
 
             var landed = Game.Instance.Map.GetShotLandedPosition(vec, dir); //for clientside purposes
 
-            Game.Instance.ClientHandler.SendMessage("playerShot", vec.X.ToSafeString(), vec.Y.ToSafeString(), dir.X.ToSafeString(), dir.Y.ToSafeString());
+            Game.Instance.ClientHandler.SendMessage(ProtocolType.Udp, "playerShot", vec.X.ToSafeString(), vec.Y.ToSafeString(), dir.X.ToSafeString(), dir.Y.ToSafeString());
 
             Game.Instance.SpawnEffect(new BulletTraceFX(PartialPos, landed, 2));
-        }
-    }
-
-    public class BulletTraceFX : EntityFX
-    {
-        private Vector2 _dest;
-
-        public BulletTraceFX(Vector2 pos, Vector2 to, int maxAge) : base(pos, maxAge)
-        {
-            _dest = to;
-        }
-
-        public override void Update()
-        {
-            if (Age++ >= MaxAge)
-                isAlive = false;
-        }
-
-        public override void Move()
-        {
-
-        }
-
-        public override void Render(float partialTicks)
-        {
-            GL.Translate(pos.X, pos.Y, 0);
-            GL.Begin(PrimitiveType.Lines);
-            GL.Color3(1f, 0, 0);
-            GL.Vertex2(0, 0);
-            GL.Color3(1, 1, 0f);
-            GL.Vertex2(_dest);
-            GL.End();
-            GL.Translate(-pos.X, -pos.Y, 0);
-        }
-    }
-
-    public class EntityFX : Entity
-    {
-        public int Age;
-        public int MaxAge;
-
-        protected EntityFX(Vector2 pos, int maxAge) : base(pos)
-        {
-            MaxAge = maxAge;
-        }
-
-        public override void Update()
-        {
-            if (Age++ >= MaxAge)
-                isAlive = false;
-
-            base.Update();
         }
     }
 }

@@ -1,21 +1,31 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using OpenTK;
+using SharpStrike;
 
-namespace SharpStrike
+namespace SharpStrikeServer
 {
+    class Program
+    {
+        static void Main(string[] args)
+        {
+        }
+    }
+
     public class UDPWrapper
     {
         private ConcurrentQueue<Tuple<IPEndPoint, string>> _messageQueue = new ConcurrentQueue<Tuple<IPEndPoint, string>>();
 
         private UdpClient _client;
 
-        public EventHandler<UDPPacketEventArgs> OnReceivedMessage;
+        public EventHandler<PacketEventArgs> OnReceivedMessage;
 
         public UDPWrapper(UdpClient client, int port)
         {
@@ -47,11 +57,9 @@ namespace SharpStrike
 
                             var code = split[0];
 
-                            var id = split[1];
+                            split = split.Skip(1).ToArray();
 
-                            split = split.Skip(2).ToArray();
-
-                            OnReceivedMessage?.Invoke(this, new UDPPacketEventArgs(message.Item1, Guid.Parse(id), code, split));
+                            OnReceivedMessage?.Invoke(this, new PacketEventArgs(code, split));
                         }
                         else
                             Thread.Sleep(1);
@@ -65,9 +73,9 @@ namespace SharpStrike
         /// </summary>
         /// <param name="code"></param>
         /// <param name="data"></param>
-        public void SendMessage(Guid sender, string code,  params string[] data)
+        public void SendMessage(string code, params string[] data)
         {
-            var bytes = ParseMessage(sender, code, data);
+            var bytes = ParseMessage(code, data);
 
             _client.Send(bytes, bytes.Length);
         }
@@ -78,22 +86,81 @@ namespace SharpStrike
         /// <param name="to"></param>
         /// <param name="code"></param>
         /// <param name="data"></param>
-        public void SendMessageTo(IPEndPoint to, Guid sender, string code, params string[] data)
+        public void SendMessageTo(IPEndPoint to, string code, params string[] data)
         {
-            var bytes = ParseMessage(sender, code, data);
+            var bytes = ParseMessage(code, data);
 
             _client.Send(bytes, bytes.Length, to);
         }
 
-        private byte[] ParseMessage(Guid sender, string code, params string[] data)
+        private byte[] ParseMessage(string code, params string[] data)
         {
             code = code.Replace("|", "{p}");
 
             for (int i = 0; i < data.Length; i++)
                 data[i] = data[i].Replace("|", "{p}");
 
-            var joined = string.Join("|", code, sender.ToString(), string.Join("|", data));
+            var joined = string.Join("|", code, string.Join("|", data));
             return Encoding.UTF8.GetBytes(joined);
+        }
+    }
+
+    public class PacketEventArgs : EventArgs
+    {
+        public string Code { get; }
+        public string[] Data { get; }
+
+        public PacketEventArgs(string code, string[] data)
+        {
+            Code = code;
+            Data = data;
+        }
+    }
+
+    class PlayerDummy
+    {
+        public Guid ID { get; }
+
+        public float X { get; private set; }
+        public float Y { get; private set; }
+
+        public float Health
+        {
+            get => _health;
+            set => _health = Math.Min(100, Math.Max(0, value));
+        }
+
+        private float _health = 100;
+
+        private AxisAlignedBB boundingBox, collisionBoundingBox;
+
+        public PlayerDummy(float x, float y)
+        {
+            X = x;
+            Y = y;
+
+            var pos = new Vector2(x, y);
+
+            collisionBoundingBox = new AxisAlignedBB(25);
+
+            boundingBox = collisionBoundingBox.Offset(pos - Vector2.UnitX * collisionBoundingBox.size.X / 2 - Vector2.UnitY * collisionBoundingBox.size.Y / 2);
+
+            ID = Guid.NewGuid();
+        }
+
+        public void SetPos(float x, float y)
+        {
+            X = x;
+            Y = y;
+
+            var pos = new Vector2(x, y);
+
+            boundingBox = collisionBoundingBox.Offset(pos - Vector2.UnitX * collisionBoundingBox.size.X / 2 - Vector2.UnitY * collisionBoundingBox.size.Y / 2);
+        }
+
+        public AxisAlignedBB GetBoundingBox()
+        {
+            return boundingBox;
         }
     }
 }
