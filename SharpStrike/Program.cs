@@ -18,7 +18,7 @@ namespace SharpStrike
                     port = po;
                 if (last == "-ip")
                     ip = s;
-                    
+
                 last = s;
             }
 

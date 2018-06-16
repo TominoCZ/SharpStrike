@@ -18,7 +18,7 @@ namespace SharpStrike
 
         private readonly Stopwatch _updateTimer = new Stopwatch();
 
-        private readonly Random _rand = new Random();
+        public Random Random = new Random();
 
         public Point MouseLast;
 
@@ -34,6 +34,7 @@ namespace SharpStrike
         private ServerHandler _server;
 
         private float _tickrateRatio => 60 / (float)TargetUpdateFrequency;
+
         public float PartialTicks { get; private set; }
 
         public Game(bool server, string ip, int port) : base(640, 480, new GraphicsMode(32, 24, 0, 8), "SharpStrike")
@@ -70,7 +71,7 @@ namespace SharpStrike
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             GL.ActiveTexture(TextureUnit.Texture0);
 
-            Player = new EntityPlayer(50, 50, 20, Color.Red);
+            Player = new EntityPlayer(50, 50, 40, Color.Red);
         }
 
         public void SpawnEffect(EntityFX efx)
@@ -117,44 +118,12 @@ namespace SharpStrike
             if (!Visible)
                 return;
 
-            if (Focused)
+            if (Player.IsAlive)
             {
-                var state = Keyboard.GetState();
+                HandleInput();
 
-                var dir = Vector2.Zero;
-
-                if (state.IsKeyDown(Key.W))
-                {
-                    dir.Y -= 1;
-                }
-
-                if (state.IsKeyDown(Key.S))
-                {
-                    dir.Y += 1;
-                }
-
-                if (state.IsKeyDown(Key.A))
-                {
-                    dir.X -= 1;
-                }
-
-                if (state.IsKeyDown(Key.D))
-                {
-                    dir.X += 1;
-                }
-
-                if (dir.Length > 0)
-                {
-                    dir.Normalize();
-                    dir *= 3;
-
-                    Player.motion = dir * _tickrateRatio;
-                }
-
-                ClientHandler.SendMessage(ProtocolType.Udp, "playerPos", Player.pos.X.ToSafeString(), Player.pos.Y.ToSafeString());
+                Player.Update();
             }
-
-            Player.Update();
 
             for (var index = _effects.Count - 1; index >= 0; index--)
             {
@@ -162,7 +131,7 @@ namespace SharpStrike
 
                 effect.Update();
 
-                if (!effect.isAlive)
+                if (!effect.IsAlive)
                     _effects.Remove(effect);
             }
 
@@ -212,6 +181,52 @@ namespace SharpStrike
             // RenderShadowFbo = new FBO();*/
 
             OnRenderFrame(null);
+        }
+
+        private void HandleInput()
+        {
+            if (Focused)
+            {
+                var state = Keyboard.GetState();
+
+                var dir = Vector2.Zero;
+
+                if (state.IsKeyDown(Key.W))
+                {
+                    dir.Y -= 1;
+                }
+
+                if (state.IsKeyDown(Key.S))
+                {
+                    dir.Y += 1;
+                }
+
+                if (state.IsKeyDown(Key.A))
+                {
+                    dir.X -= 1;
+                }
+
+                if (state.IsKeyDown(Key.D))
+                {
+                    dir.X += 1;
+                }
+
+                if (dir.Length > 0)
+                {
+                    dir.Normalize();
+                    dir *= 3;
+
+                    Player.motion = dir * _tickrateRatio;
+                }
+
+                var payload = new ByteBufferWriter(1);
+                payload.WriteGuid(ClientHandler.ID);
+                payload.WriteFloat(Player.pos.X);
+                payload.WriteFloat(Player.pos.Y);
+                payload.WriteFloat(Player.Rotation);
+
+                ClientHandler.SendMessage(ProtocolType.Udp, payload);
+            }
         }
     }
 }

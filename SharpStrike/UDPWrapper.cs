@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -11,7 +9,7 @@ namespace SharpStrike
 {
     public class UDPWrapper
     {
-        private ConcurrentQueue<Tuple<IPEndPoint, string>> _messageQueue = new ConcurrentQueue<Tuple<IPEndPoint, string>>();
+        private ConcurrentQueue<Tuple<IPEndPoint, byte[]>> _messageQueue = new ConcurrentQueue<Tuple<IPEndPoint, byte[]>>();
 
         private UdpClient _client;
 
@@ -29,7 +27,7 @@ namespace SharpStrike
                 {
                     var data = _client.Receive(ref from);
 
-                    _messageQueue.Enqueue(new Tuple<IPEndPoint, string>(from, Encoding.UTF8.GetString(data)));
+                    _messageQueue.Enqueue(new Tuple<IPEndPoint, byte[]>(from, data));
                 }
             });
 
@@ -41,23 +39,13 @@ namespace SharpStrike
                         {
                             _messageQueue.TryDequeue(out var message);
 
-                            var split = message.Item2.Split('|');
-                            for (int i = 0; i < split.Length; i++)
-                                split[i] = split[i].Replace("{p}", "|");
-
-                            var code = split[0];
-
-                            var id = split[1];
-
-                            split = split.Skip(2).ToArray();
-
-                            OnReceivedMessage?.Invoke(this, new UDPPacketEventArgs(message.Item1, Guid.Parse(id), code, split));
+                            OnReceivedMessage?.Invoke(this, new UDPPacketEventArgs(message.Item1, new ByteBufferReader(message.Item2)));
                         }
                         else
                             Thread.Sleep(1);
                     }
                 })
-                { IsBackground = true }.Start();
+            { IsBackground = true }.Start();
         }
 
         /// <summary>
@@ -65,9 +53,9 @@ namespace SharpStrike
         /// </summary>
         /// <param name="code"></param>
         /// <param name="data"></param>
-        public void SendMessage(Guid sender, string code,  params string[] data)
+        public void SendMessage(ByteBufferWriter byteBuffer)
         {
-            var bytes = ParseMessage(sender, code, data);
+            var bytes = byteBuffer.ToArray();
 
             _client.Send(bytes, bytes.Length);
         }
@@ -78,22 +66,11 @@ namespace SharpStrike
         /// <param name="to"></param>
         /// <param name="code"></param>
         /// <param name="data"></param>
-        public void SendMessageTo(IPEndPoint to, Guid sender, string code, params string[] data)
+        public void SendMessageTo(IPEndPoint to, ByteBufferWriter byteBuffer)
         {
-            var bytes = ParseMessage(sender, code, data);
+            var bytes = byteBuffer.ToArray();
 
             _client.Send(bytes, bytes.Length, to);
-        }
-
-        private byte[] ParseMessage(Guid sender, string code, params string[] data)
-        {
-            code = code.Replace("|", "{p}");
-
-            for (int i = 0; i < data.Length; i++)
-                data[i] = data[i].Replace("|", "{p}");
-
-            var joined = string.Join("|", code, sender.ToString(), string.Join("|", data));
-            return Encoding.UTF8.GetBytes(joined);
         }
     }
 }

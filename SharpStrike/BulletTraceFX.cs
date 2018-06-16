@@ -14,17 +14,23 @@ namespace SharpStrike
 
         public override void Update()
         {
+            if (Age == 0)
+            {
+                //TODO - spawn particles
+            }
+
             if (Age++ >= MaxAge)
-                isAlive = false;
+                IsAlive = false;
         }
 
         public override void Move()
         {
-
         }
 
         public override void Render(float partialTicks)
         {
+            //todo maybe render a bullet?
+            GL.LineWidth(3);
             GL.Translate(pos.X, pos.Y, 0);
             GL.Begin(PrimitiveType.Lines);
             GL.Color3(1f, 0, 0);
@@ -33,6 +39,7 @@ namespace SharpStrike
             GL.Vertex2(_dest);
             GL.End();
             GL.Translate(-pos.X, -pos.Y, 0);
+            GL.LineWidth(1);
         }
     }
 }

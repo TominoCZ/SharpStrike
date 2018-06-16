@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
-using System.Linq;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -11,8 +9,8 @@ namespace SharpStrike
 {
     public class TCPServerWrapper
     {
-        private ConcurrentQueue<Tuple<TcpClient, string>> _messageQueue =
-            new ConcurrentQueue<Tuple<TcpClient, string>>();
+        private ConcurrentQueue<Tuple<TcpClient, byte[]>> _messageQueue =
+            new ConcurrentQueue<Tuple<TcpClient, byte[]>>();
 
         private ConcurrentDictionary<TcpClient, NetworkStream> _connected =
             new ConcurrentDictionary<TcpClient, NetworkStream>();
@@ -46,9 +44,9 @@ namespace SharpStrike
                     {
                         if (pair.Value.DataAvailable)
                         {
-                            using (var sr = new StreamReader(pair.Value))
+                            using (var sr = new BinaryReader(pair.Value))
                             {
-                                _messageQueue.Enqueue(new Tuple<TcpClient, string>(pair.Key, sr.ReadToEnd()));
+                                _messageQueue.Enqueue(new Tuple<TcpClient, byte[]>(pair.Key, sr.ReadBytes(pair.Key.Available)));
                             }
                         }
                     }
@@ -63,21 +61,15 @@ namespace SharpStrike
                         {
                             _messageQueue.TryDequeue(out var message);
 
-                            var split = message.Item2.Split('|');
-                            for (int i = 0; i < split.Length; i++)
-                                split[i] = split[i].Replace("{p}", "|");
+                            var payload = new ByteBufferReader(message.Item2);
 
-                            var code = split[0];
-
-                            split = split.Skip(1).ToArray();
-
-                            OnReceivedMessage?.Invoke(this, new TCPPacketEventArgs(message.Item1, Guid.Empty, code, split));
+                            OnReceivedMessage?.Invoke(this, new TCPPacketEventArgs(message.Item1, payload));
                         }
                         else
                             Thread.Sleep(1);
                     }
                 })
-                { IsBackground = true }.Start();
+            { IsBackground = true }.Start();
         }
 
         /// <summary>
@@ -85,23 +77,12 @@ namespace SharpStrike
         /// </summary>
         /// <param name="code"></param>
         /// <param name="data"></param>
-        public void SendMessage(TcpClient to, string code, params string[] data)
+        public void SendMessage(TcpClient to, ByteBufferWriter byteBuffer)
         {
-            var bytes = ParseMessage(code, data);
+            var bytes = byteBuffer.ToArray();
 
             if (_connected.TryGetValue(to, out var tcp))
                 tcp.Write(bytes, 0, bytes.Length);
-        }
-
-        private byte[] ParseMessage(string code, params string[] data)
-        {
-            code = code.Replace("|", "{p}");
-
-            for (int i = 0; i < data.Length; i++)
-                data[i] = data[i].Replace("|", "{p}");
-
-            var joined = string.Join("|", code, string.Join("|", data));
-            return Encoding.UTF8.GetBytes(joined);
         }
     }
 }

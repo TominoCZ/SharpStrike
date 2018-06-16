@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.IO;
-using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -11,7 +9,7 @@ namespace SharpStrike
 {
     public class TCPClientWrapper
     {
-        private ConcurrentQueue<string> _messageQueue = new ConcurrentQueue<string>();
+        private ConcurrentQueue<byte[]> _messageQueue = new ConcurrentQueue<byte[]>();
 
         private TcpClient _client;
 
@@ -32,8 +30,8 @@ namespace SharpStrike
                             var data = new byte[_client.Available];
                             stream.Read(data, 0, data.Length);
 
-                            var msg = Encoding.UTF8.GetString(data);
-                            _messageQueue.Enqueue(msg);
+                            //var msg = Encoding.UTF8.GetString(data);
+                            _messageQueue.Enqueue(data);
                         }
                     }
                 }
@@ -46,7 +44,7 @@ namespace SharpStrike
                         if (!_messageQueue.IsEmpty)
                         {
                             _messageQueue.TryDequeue(out var message);
-
+                            /*
                             var split = message.Split('|');
                             for (int i = 0; i < split.Length; i++)
                                 split[i] = split[i].Replace("{p}", "|");
@@ -54,8 +52,12 @@ namespace SharpStrike
                             var code = split[0];
 
                             split = split.Skip(1).ToArray();
+                            */
 
-                            OnReceivedMessage?.Invoke(this, new TCPPacketEventArgs(null, Guid.Empty, code, split));
+                            using (var pr = new ByteBufferReader(message))
+                            {
+                                OnReceivedMessage?.Invoke(this, new TCPPacketEventArgs(null, pr));
+                            }
                         }
                         else
                             Thread.Sleep(1);
@@ -63,19 +65,19 @@ namespace SharpStrike
                 })
             { IsBackground = true }.Start();
         }
+
         /// <summary>
         /// Used to send data to a specific IP address and port
         /// </summary>
         /// <param name="to"></param>
         /// <param name="code"></param>
         /// <param name="data"></param>
-        public void SendMessage(Guid sender, string code, params string[] data)
+        public void SendMessage(ByteBufferWriter byteBuffer)
         {
-            var bytes = ParseMessage(sender, code, data);
-
             using (var stream = _client.GetStream())
             {
-                stream.Write(bytes, 0, bytes.Length);
+                var data = byteBuffer.ToArray();
+                stream.Write(data, 0, data.Length);
             }
         }
 

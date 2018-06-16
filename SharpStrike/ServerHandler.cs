@@ -1,17 +1,20 @@
-﻿using System;
+﻿using OpenTK;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using OpenTK;
 
 namespace SharpStrike
 {
     public class ServerHandler
     {
         private ConcurrentDictionary<Guid, PlayerDummy> _players = new ConcurrentDictionary<Guid, PlayerDummy>();
+
+        private List<AxisAlignedBB> _boxes = new List<AxisAlignedBB>();
 
         private UDPWrapper _wrapperUDP;
         private TCPServerWrapper _wrapperTCP;
@@ -34,14 +37,53 @@ namespace SharpStrike
             _wrapperTCP.OnReceivedMessage += OnReceivedTCPMessage;
             _wrapperTCP.OnClientConnected += OnClientConnected;
 
+            LoadMap();
+
             RunLoop();
+        }
+
+        private void LoadMap()
+        {
+            var file = "maps\\map0.ssmap";
+
+            if (!File.Exists(file))
+                return;
+
+            var payload = new ByteBufferReader(File.ReadAllBytes(file));
+
+            var count = payload.ReadInt32();
+
+            for (int i = 0; i < count; i++)
+            {
+                var minX = payload.ReadFloat();
+                var minY = payload.ReadFloat();
+                var maxX = payload.ReadFloat();
+                var maxY = payload.ReadFloat();
+
+                _boxes.Add(new AxisAlignedBB(minX, minY, maxX, maxY));
+            }
         }
 
         private void OnClientConnected(object sender, TcpClient e)
         {
             var id = Guid.NewGuid();
             _players.TryAdd(id, new PlayerDummy(0, 0));
-            _wrapperTCP.SendMessage(e, "init", id.ToString(), _tickrate.ToString());
+
+            var payload = new ByteBufferWriter(0);
+            payload.WriteGuid(id);
+            payload.WriteInt32(_tickrate);
+
+            payload.WriteInt32(_boxes.Count);
+
+            foreach (var box in _boxes)
+            {
+                payload.WriteFloat(box.min.X);
+                payload.WriteFloat(box.min.Y);
+                payload.WriteFloat(box.max.X);
+                payload.WriteFloat(box.max.Y);
+            }
+
+            _wrapperTCP.SendMessage(e, payload);
         }
 
         private void RunLoop()
@@ -60,22 +102,25 @@ namespace SharpStrike
 
         private void GameLoop()
         {
-            var msg = new List<string>();
+            var payload = new ByteBufferWriter(1);
 
-            foreach (var player in _players)
+            var players = _players.ToArray();
+
+            payload.WriteInt32(players.Length);
+
+            foreach (var player in players)
             {
-                msg.Add(player.Key.ToString());
-                msg.Add(player.Value.X.ToSafeString());
-                msg.Add(player.Value.Y.ToSafeString());
-                msg.Add(player.Value.Health.ToSafeString());
+                payload.WriteGuid(player.Key);
+                payload.WriteFloat(player.Value.X);
+                payload.WriteFloat(player.Value.Y);
+                payload.WriteFloat(player.Value.Health);
+                payload.WriteFloat(player.Value.Rotation);
             }
 
             foreach (var dummy in _players.Values)
             {
-                SendUDPMessageTo(dummy, "players", msg.ToArray());
+                SendUDPMessageTo(dummy, payload);
             }
-
-            //SendUDPMessageToAllExcept(null, "players", msg.ToArray());
         }
 
         private void OnReceivedTCPMessage(object s, TCPPacketEventArgs e)
@@ -85,23 +130,28 @@ namespace SharpStrike
 
         private void OnReceivedUDPMessage(object s, UDPPacketEventArgs e)
         {
-            if (!_players.TryGetValue(e.SenderID, out var player))
+            if (!_players.TryGetValue(e.ByteBuffer.ReadGuid(), out var player))
                 return;
 
             if (!player.UDPLoaded)
                 player.SetUDP(e.From);
 
-            switch (e.Code)
+            if (player.Health <= 0)
+                return;
+
+            switch (e.ByteBuffer.Code)
             {
-                case "playerPos":
-                    player.SetPos(e.Data[0].ToSafeFloat(), e.Data[1].ToSafeFloat());
+                case 1:
+                    player.SetPos(e.ByteBuffer.ReadFloat(), e.ByteBuffer.ReadFloat());
+                    player.Rotation = e.ByteBuffer.ReadFloat();
 
                     break;
-                case "playerShot":
-                    var pos = new Vector2(e.Data[0].ToSafeFloat(), e.Data[1].ToSafeFloat());
-                    var dir = new Vector2(e.Data[2].ToSafeFloat(), e.Data[3].ToSafeFloat());
 
-                    var _hit = new List<Tuple<float, PlayerDummy>>();
+                case 2:
+                    var pos = new Vector2(e.ByteBuffer.ReadFloat(), e.ByteBuffer.ReadFloat());
+                    var dir = new Vector2(e.ByteBuffer.ReadFloat(), e.ByteBuffer.ReadFloat());
+
+                    var hit = new List<Tuple<float, PlayerDummy>>();
 
                     foreach (var playerDummy in _players.Values)
                     {
@@ -110,13 +160,13 @@ namespace SharpStrike
 
                         if (RayHelper.Intersects(playerDummy.GetBoundingBox(), pos, dir, out var dist))
                         {
-                            _hit.Add(new Tuple<float, PlayerDummy>(dist, playerDummy));
+                            hit.Add(new Tuple<float, PlayerDummy>(dist, playerDummy));
                         }
                     }
 
                     var damageToDeal = 35f;
 
-                    foreach (var tuple in _hit.OrderBy(el => el.Item1))
+                    foreach (var tuple in hit.OrderBy(el => el.Item1))
                     {
                         tuple.Item2.Health -= damageToDeal;
 
@@ -125,30 +175,36 @@ namespace SharpStrike
 
                     dir *= float.MaxValue;
 
-                    SendUDPMessageToAllExcept(player, "playerShot", e.Data[0], e.Data[1], dir.X.ToSafeString(), dir.Y.ToSafeString());
+                    var payload = new ByteBufferWriter(e.ByteBuffer.Code);
+                    payload.WriteFloat(pos.X);
+                    payload.WriteFloat(pos.Y);
+                    payload.WriteFloat(dir.X);
+                    payload.WriteFloat(dir.Y);
+
+                    SendUDPMessageToAllExcept(player, payload);
 
                     break;
             }
         }
 
-        private void SendUDPMessageToAllExcept(PlayerDummy except, string code, params string[] data)
+        private void SendUDPMessageToAllExcept(PlayerDummy except, ByteBufferWriter byteBuffer)
         {
             foreach (var dummy in _players.Values)
             {
                 if (Equals(dummy, except))
                     continue;
 
-                SendUDPMessageTo(dummy, code, data);
+                SendUDPMessageTo(dummy, byteBuffer);
             }
         }
 
-        private void SendUDPMessageTo(PlayerDummy to, string code, params string[] data)
+        private void SendUDPMessageTo(PlayerDummy to, ByteBufferWriter byteBuffer)
         {
             if (to.UDPLoaded)
-                _wrapperUDP.SendMessageTo(to.UDP, Guid.Empty, code, data);
+                _wrapperUDP.SendMessageTo(to.UDP, byteBuffer);
         }
 
-        class PlayerDummy
+        private class PlayerDummy
         {
             public float X { get; private set; }
             public float Y { get; private set; }
@@ -162,6 +218,8 @@ namespace SharpStrike
                 get => _health;
                 set => _health = Math.Min(100, Math.Max(0, value));
             }
+
+            public float Rotation;
 
             private float _health = 100;
 

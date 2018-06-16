@@ -1,6 +1,5 @@
 ﻿using OpenTK;
 using System;
-using System.ComponentModel;
 
 namespace SharpStrike
 {

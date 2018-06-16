@@ -15,7 +15,7 @@ namespace SharpStrike
         public override void Update()
         {
             if (Age++ >= MaxAge)
-                isAlive = false;
+                IsAlive = false;
 
             base.Update();
         }

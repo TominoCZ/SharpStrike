@@ -1,5 +1,4 @@
-﻿using System;
-using System.Net;
+﻿using System.Net;
 
 namespace SharpStrike
 {
@@ -7,9 +6,9 @@ namespace SharpStrike
     {
         public IPEndPoint From { get; }
 
-        public UDPPacketEventArgs(IPEndPoint @from, Guid senderID, string code, string[] data) : base(senderID, code, data)
+        public UDPPacketEventArgs(IPEndPoint from, ByteBufferReader byteBuffer) : base(byteBuffer)
         {
-            From = @from;
+            From = from;
         }
     }
 }

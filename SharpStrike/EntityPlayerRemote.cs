@@ -1,7 +1,6 @@
-﻿using System;
-using System.Drawing;
-using OpenTK;
+﻿using OpenTK;
 using OpenTK.Graphics.OpenGL;
+using System;
 
 namespace SharpStrike
 {
@@ -9,6 +8,10 @@ namespace SharpStrike
     {
         private float _size;
         private float _health = 100;
+
+        public override bool IsAlive => Health > 0;
+
+        public float Rotation;
 
         public float Health
         {
@@ -26,32 +29,35 @@ namespace SharpStrike
 
         public override void Update()
         {
-            isAlive = Health > 0;
-
             lastPos = pos;
         }
 
         public override void Move()
         {
-
         }
 
         public override void Render(float partialTicks)
         {
-            if (!isAlive)
+            if (!IsAlive)
                 return;
 
             var partialPos = lastPos + (pos - lastPos) * partialTicks;
-            
-            GL.Color4(Color.DodgerBlue);
+
+            GL.Color3(1, 1, 1f);
+
+            GL.BindTexture(TextureTarget.Texture2D, TextureManager.GetOrRegister("blu"));
 
             GL.Translate(partialPos.X, partialPos.Y, 0);
             GL.Scale(_size, _size, 1);
-            GL.Begin(PrimitiveType.Polygon);
-            VertexUtil.PutCircle();
+            GL.Rotate(Rotation, 0, 0, 1);
+            GL.Begin(PrimitiveType.Quads);
+            VertexUtil.PutQuad();
             GL.End();
+            GL.Rotate(Rotation, 0, 0, -1);
             GL.Scale(1 / _size, 1 / _size, 1);
             GL.Translate(-partialPos.X, -partialPos.Y, 0);
+
+            GL.BindTexture(TextureTarget.Texture2D, 0);
         }
     }
 }

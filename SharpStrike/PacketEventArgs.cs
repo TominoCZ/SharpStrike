@@ -1,21 +1,12 @@
-﻿using System;
-using System.CodeDom;
-
-namespace SharpStrike
+﻿namespace SharpStrike
 {
-    public abstract class PacketEventArgs : EventArgs
+    public class PacketEventArgs
     {
-        public string Code { get; }
-        public string[] Data { get; }
+        public ByteBufferReader ByteBuffer { get; }
 
-        public Guid SenderID { get; }
-
-        protected PacketEventArgs(Guid senderID, string code, string[] data)
+        public PacketEventArgs(ByteBufferReader byteBuffer)
         {
-            SenderID = senderID;
-
-            Code = code;
-            Data = data;
+            ByteBuffer = byteBuffer;
         }
     }
 }

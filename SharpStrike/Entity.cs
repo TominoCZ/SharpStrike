@@ -13,7 +13,7 @@ namespace SharpStrike
 
         public Vector2 motion;
 
-        public bool isAlive = true;
+        public virtual bool IsAlive { get; set; } = true;
 
         protected Entity(Vector2 pos)
         {
@@ -86,7 +86,7 @@ namespace SharpStrike
 
         public virtual void SetDead()
         {
-            isAlive = false;
+            IsAlive = false;
         }
 
         public AxisAlignedBB getEntityBoundingBox()

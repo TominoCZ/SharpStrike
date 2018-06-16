@@ -1,31 +1,27 @@
-﻿using System;
+﻿using OpenTK;
+using OpenTK.Graphics.OpenGL;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using OpenTK;
-using OpenTK.Graphics.OpenGL;
 
 namespace SharpStrike
 {
     public class Map
     {
-        ConcurrentDictionary<Guid, EntityPlayerRemote> _players = new ConcurrentDictionary<Guid, EntityPlayerRemote>();
+        private ConcurrentDictionary<Guid, EntityPlayerRemote> _players = new ConcurrentDictionary<Guid, EntityPlayerRemote>();
 
         private readonly Stopwatch _interpolationTimer = new Stopwatch();
 
-        private readonly List<AxisAlignedBB> _collisionBoxes = new List<AxisAlignedBB>
+        private List<AxisAlignedBB> _collisionBoxes = new List<AxisAlignedBB>();
+
+        public void LoadBBs(List<AxisAlignedBB> boxes)
         {
-            new AxisAlignedBB(100, 100, 150, 150),
-            new AxisAlignedBB(300, 100, 350, 150),
-            new AxisAlignedBB(500, 100, 550, 150),
+            _collisionBoxes = boxes;
+        }
 
-            new AxisAlignedBB(100, 300, 150, 350),
-            new AxisAlignedBB(300, 300, 350, 350),
-            new AxisAlignedBB(500, 300, 550, 350)
-        };
-
-        public void SyncPlayers(List<Tuple<Guid, float, float, float>> data)
+        public void SyncPlayers(List<Tuple<Guid, float, float, float, float>> data)
         {
             foreach (var player in _players.Values)
             {
@@ -35,11 +31,15 @@ namespace SharpStrike
             foreach (var tuple in data)
             {
                 if (Equals(tuple.Item1, Game.Instance.ClientHandler.ID))
+                {
+                    Game.Instance.Player.Health = tuple.Item4;
                     continue;
+                }
 
-                var ep = _players.GetOrAdd(tuple.Item1, new EntityPlayerRemote(tuple.Item2, tuple.Item3, 20));
+                var ep = _players.GetOrAdd(tuple.Item1, new EntityPlayerRemote(tuple.Item2, tuple.Item3, 40));
                 ep.MoveTo(tuple.Item2, tuple.Item3);
                 ep.Health = tuple.Item4;
+                ep.Rotation = tuple.Item5;
             }
 
             _interpolationTimer.Restart();
@@ -85,7 +85,8 @@ namespace SharpStrike
 
             foreach (var player in _players.Values)
             {
-                player.Render(partialTicks);
+                if (player.IsAlive)
+                    player.Render(partialTicks);
             }
         }
 
@@ -115,7 +116,7 @@ namespace SharpStrike
                     var point = box[index];
 
                     //sum of dat magic
-                    if (isLeft(pointNext, point, viewingPos))
+                    if (IsLeft(pointNext, point, viewingPos))
                     {
                         GL.Vertex2(point);
 
@@ -171,7 +172,7 @@ namespace SharpStrike
                 var point = box[index];
 
                 //sum of dat magic
-                if (!isLeft(pointNext, point, viewer))
+                if (!IsLeft(pointNext, point, viewer))
                 {
                     newShape.Add(point);
 
@@ -192,7 +193,7 @@ namespace SharpStrike
 
         #endregion deprecated
 
-        public bool isLeft(Vector2 a, Vector2 b, Vector2 c)
+        public bool IsLeft(Vector2 a, Vector2 b, Vector2 c)
         {
             var val = (c.X - a.X) * (b.Y - a.Y) - (c.Y - a.Y) * (b.X - a.X);
             return val > 0;

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Net.Sockets;
+﻿using System.Net.Sockets;
 
 namespace SharpStrike
 {
@@ -7,9 +6,9 @@ namespace SharpStrike
     {
         public TcpClient From { get; }
 
-        public TCPPacketEventArgs(TcpClient @from, Guid senderID, string code, string[] data) : base(senderID, code, data)
+        public TCPPacketEventArgs(TcpClient from, ByteBufferReader byteBuffer) : base(byteBuffer)
         {
-            From = @from;
+            From = from;
         }
     }
 }
