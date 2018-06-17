@@ -5,7 +5,7 @@ namespace SharpStrike
 {
     public class FBO
     {
-        private int _textureID;
+        private int _textureId;
 
         private int _frameBuffer;
         private int _depthBuffer;
@@ -32,7 +32,7 @@ namespace SharpStrike
             CreateDepthBuffer();
 
             // Set "renderedTexture" as our colour attachement #0
-            GL.FramebufferTexture(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, _textureID, 0);
+            GL.FramebufferTexture(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, _textureId, 0);
 
             // Set the list of draw buffers.
             GL.DrawBuffer(DrawBufferMode.ColorAttachment0); // "1" is the size of DrawBuffers
@@ -47,9 +47,9 @@ namespace SharpStrike
 
         private void CreateTexture()
         {
-            _textureID = GL.GenTexture();
+            _textureId = GL.GenTexture();
 
-            GL.BindTexture(TextureTarget.Texture2D, _textureID);
+            GL.BindTexture(TextureTarget.Texture2D, _textureId);
 
             GL.TexImage2D(
                 TextureTarget.Texture2D,
@@ -93,7 +93,7 @@ namespace SharpStrike
 
         public void BindTexture()
         {
-            GL.BindTexture(TextureTarget.Texture2D, _textureID);
+            GL.BindTexture(TextureTarget.Texture2D, _textureId);
         }
 
         public void Bind()
@@ -112,7 +112,7 @@ namespace SharpStrike
         public void Destroy()
         {
             GL.DeleteFramebuffer(_frameBuffer);
-            GL.DeleteTexture(_textureID);
+            GL.DeleteTexture(_textureId);
         }
     }
 }

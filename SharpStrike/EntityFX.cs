@@ -2,12 +2,12 @@
 
 namespace SharpStrike
 {
-    public class EntityFX : Entity
+    public class EntityFx : Entity
     {
         public int Age;
         public int MaxAge;
 
-        protected EntityFX(Vector2 pos, int maxAge) : base(pos)
+        protected EntityFx(Vector2 pos, int maxAge) : base(pos)
         {
             MaxAge = maxAge;
         }

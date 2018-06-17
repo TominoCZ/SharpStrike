@@ -7,33 +7,33 @@ namespace SharpStrike
 {
     public class ClientHandler
     {
-        private UDPWrapper _wrapperUDP;
-        private TCPClientWrapper _wrapperTCP;
+        private UdpWrapper _wrapperUdp;
+        private TcpClientWrapper _wrapperTcp;
 
-        public Guid ID;
+        public Guid Id;
 
         public ClientHandler(string ip, int port)
         {
             var udp = new UdpClient();
             var tcp = new TcpClient();
             udp.Connect(ip, port);
-
+            
             tcp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
 
-            _wrapperUDP = new UDPWrapper(udp, port);
-            _wrapperUDP.OnReceivedMessage += OnReceivedUDPMessage;
-            _wrapperTCP = new TCPClientWrapper(tcp);
-            _wrapperTCP.OnReceivedMessage += OnReceivedTCPMessage;
+            _wrapperUdp = new UdpWrapper(udp, port);
+            _wrapperUdp.OnReceivedMessage += OnReceivedUdpMessage;
+            _wrapperTcp = new TcpClientWrapper(tcp);
+            _wrapperTcp.OnReceivedMessage += OnReceivedTcpMessage;
 
             tcp.Connect(ip, port);
         }
 
-        private void OnReceivedTCPMessage(object sender, TCPPacketEventArgs e)
+        private void OnReceivedTcpMessage(object sender, TcpPacketEventArgs e)
         {
             switch (e.ByteBuffer.Code)
             {
                 case 0:
-                    ID = e.ByteBuffer.ReadGuid();
+                    Id = e.ByteBuffer.ReadGuid();
                     Game.Instance.TargetUpdateFrequency = e.ByteBuffer.ReadInt32();
 
                     var boxes = new List<AxisAlignedBB>();
@@ -42,38 +42,48 @@ namespace SharpStrike
 
                     for (int i = 0; i < count; i++)
                     {
-                        var minX = e.ByteBuffer.ReadFloat();
-                        var minY = e.ByteBuffer.ReadFloat();
-                        var maxX = e.ByteBuffer.ReadFloat();
-                        var maxY = e.ByteBuffer.ReadFloat();
+                        var min = e.ByteBuffer.ReadVec2();
+                        var max = e.ByteBuffer.ReadVec2();
 
-                        boxes.Add(new AxisAlignedBB(minX, minY, maxX, maxY));
+                        boxes.Add(new AxisAlignedBB(min, max));
                     }
 
                     Game.Instance.Map.LoadBBs(boxes);
 
                     break;
+                case 1:
+                    //teleport to position
+                    var pos = e.ByteBuffer.ReadVec2();
+
+                    Game.Instance.Player.TeleportTo(pos);
+                    break;
             }
         }
 
-        private void OnReceivedUDPMessage(object sender, UDPPacketEventArgs e)
+        private void OnReceivedUdpMessage(object sender, UdpPacketEventArgs e)
         {
             switch (e.ByteBuffer.Code)
             {
                 case 1:
-                    var players = new List<Tuple<Guid, float, float, float, float>>();
+                    var players = new List<Tuple<Guid, Vector2, Vector2, float>>();
 
                     var size = e.ByteBuffer.ReadInt32();
 
                     for (var index = 0; index < size; index++)
                     {
                         var id = e.ByteBuffer.ReadGuid();
-                        var x = e.ByteBuffer.ReadFloat();
-                        var y = e.ByteBuffer.ReadFloat();
+                        var vec = e.ByteBuffer.ReadVec2();
+                        var rotation = e.ByteBuffer.ReadVec2();
                         var health = e.ByteBuffer.ReadFloat();
-                        var rotation = e.ByteBuffer.ReadFloat();
+                        var connected = e.ByteBuffer.ReadBoolean();
 
-                        players.Add(new Tuple<Guid, float, float, float, float>(id, x, y, health, rotation));
+                        if (!connected) //TODO!!
+                        {
+                            Game.Instance.Map.RemovePlayer(id);
+                            continue;
+                        }
+
+                        players.Add(new Tuple<Guid, Vector2, Vector2, float>(id, vec, rotation, health));
                     }
 
                     Game.Instance.Map.SyncPlayers(players);
@@ -81,10 +91,10 @@ namespace SharpStrike
                     break;
 
                 case 2:
-                    var pos = new Vector2(e.ByteBuffer.ReadFloat(), e.ByteBuffer.ReadFloat());
-                    var dst = new Vector2(e.ByteBuffer.ReadFloat(), e.ByteBuffer.ReadFloat());
+                    var pos = e.ByteBuffer.ReadVec2();
+                    var dst = e.ByteBuffer.ReadVec2();
 
-                    Game.Instance.SpawnEffect(new BulletTraceFX(pos, dst, 2));
+                    Game.Instance.SpawnEffect(new BulletTraceFx(pos, dst, 2));
 
                     break;
             }
@@ -92,13 +102,13 @@ namespace SharpStrike
 
         public void SendMessage(ProtocolType protocol, ByteBufferWriter byteBuffer)
         {
-            if (ID == Guid.Empty)
+            if (Id == Guid.Empty)
                 return;
 
             if (protocol == ProtocolType.Tcp)
-                _wrapperTCP.SendMessage(byteBuffer);
+                _wrapperTcp.SendMessage(byteBuffer);
             else
-                _wrapperUDP.SendMessage(byteBuffer);
+                _wrapperUdp.SendMessage(byteBuffer);
         }
     }
 }

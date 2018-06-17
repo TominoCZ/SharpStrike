@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using OpenTK;
 
 namespace SharpStrike
 {
@@ -30,9 +31,20 @@ namespace SharpStrike
             _writer.Write(f);
         }
 
+        public void WriteVec2(Vector2 vec)
+        {
+            WriteFloat(vec.X);
+            WriteFloat(vec.Y);
+        }
+
         public void WriteString(string s)
         {
             _writer.Write(s);
+        }
+
+        public void WriteBoolean(bool b)
+        {
+            _writer.Write(b);
         }
 
         public void WriteGuid(Guid g)

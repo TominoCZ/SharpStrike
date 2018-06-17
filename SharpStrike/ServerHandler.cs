@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace SharpStrike
 {
@@ -16,8 +17,8 @@ namespace SharpStrike
 
         private List<AxisAlignedBB> _boxes = new List<AxisAlignedBB>();
 
-        private UDPWrapper _wrapperUDP;
-        private TCPServerWrapper _wrapperTCP;
+        private UdpWrapper _wrapperUdp;
+        private TcpServerWrapper _wrapperTcp;
 
         private int _tickrate;
 
@@ -30,12 +31,12 @@ namespace SharpStrike
             tcp.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
             tcp.Start();
 
-            _wrapperUDP = new UDPWrapper(udp, port);
-            _wrapperUDP.OnReceivedMessage += OnReceivedUDPMessage;
+            _wrapperUdp = new UdpWrapper(udp, port);
+            _wrapperUdp.OnReceivedMessage += OnReceivedUdpMessage;
 
-            _wrapperTCP = new TCPServerWrapper(tcp);
-            _wrapperTCP.OnReceivedMessage += OnReceivedTCPMessage;
-            _wrapperTCP.OnClientConnected += OnClientConnected;
+            _wrapperTcp = new TcpServerWrapper(tcp);
+            _wrapperTcp.OnReceivedMessage += OnReceivedTcpMessage;
+            _wrapperTcp.OnClientConnected += OnClientConnected;
 
             LoadMap();
 
@@ -55,19 +56,17 @@ namespace SharpStrike
 
             for (int i = 0; i < count; i++)
             {
-                var minX = payload.ReadFloat();
-                var minY = payload.ReadFloat();
-                var maxX = payload.ReadFloat();
-                var maxY = payload.ReadFloat();
+                var min = payload.ReadVec2();
+                var max = payload.ReadVec2();
 
-                _boxes.Add(new AxisAlignedBB(minX, minY, maxX, maxY));
+                _boxes.Add(new AxisAlignedBB(min, max));
             }
         }
 
         private void OnClientConnected(object sender, TcpClient e)
         {
             var id = Guid.NewGuid();
-            _players.TryAdd(id, new PlayerDummy(0, 0));
+            _players.TryAdd(id, new PlayerDummy(e));
 
             var payload = new ByteBufferWriter(0);
             payload.WriteGuid(id);
@@ -77,13 +76,11 @@ namespace SharpStrike
 
             foreach (var box in _boxes)
             {
-                payload.WriteFloat(box.min.X);
-                payload.WriteFloat(box.min.Y);
-                payload.WriteFloat(box.max.X);
-                payload.WriteFloat(box.max.Y);
+                payload.WriteVec2(box.Min);
+                payload.WriteVec2(box.Max);
             }
 
-            _wrapperTCP.SendMessage(e, payload);
+            _wrapperTcp.SendMessage(e, payload);
         }
 
         private void RunLoop()
@@ -108,33 +105,49 @@ namespace SharpStrike
 
             payload.WriteInt32(players.Length);
 
-            foreach (var player in players)
+            foreach (var pair in players)
             {
-                payload.WriteGuid(player.Key);
-                payload.WriteFloat(player.Value.X);
-                payload.WriteFloat(player.Value.Y);
-                payload.WriteFloat(player.Value.Health);
-                payload.WriteFloat(player.Value.Rotation);
+                if (pair.Value.NeedsRespawn)
+                {
+                    pair.Value.NeedsRespawn = false;
+                    pair.Value.Respawning = false;
+
+                    var newPos = new Vector2(); //TODO set position in a spawn area rectange
+                    pair.Value.SetPos(newPos);
+                    pair.Value.Health = 100;
+
+                    var buffer = new ByteBufferWriter(1);
+
+                    buffer.WriteVec2(newPos);
+
+                    _wrapperTcp.SendMessage(pair.Value.Tcp, buffer);
+                }
+
+                payload.WriteGuid(pair.Key);
+                payload.WriteVec2(pair.Value.Pos);
+                payload.WriteVec2(pair.Value.Rotation);
+                payload.WriteFloat(pair.Value.Health);
+                payload.WriteBoolean(pair.Value.Tcp.Connected);
             }
 
             foreach (var dummy in _players.Values)
             {
-                SendUDPMessageTo(dummy, payload);
+                SendUdpMessageTo(dummy, payload);
             }
         }
 
-        private void OnReceivedTCPMessage(object s, TCPPacketEventArgs e)
+        private void OnReceivedTcpMessage(object s, TcpPacketEventArgs e)
         {
             //todo might use
         }
 
-        private void OnReceivedUDPMessage(object s, UDPPacketEventArgs e)
+        private void OnReceivedUdpMessage(object s, UdpPacketEventArgs e)
         {
             if (!_players.TryGetValue(e.ByteBuffer.ReadGuid(), out var player))
                 return;
 
-            if (!player.UDPLoaded)
-                player.SetUDP(e.From);
+            if (!player.UdpLoaded)
+                player.SetUdp(e.From);
 
             if (player.Health <= 0)
                 return;
@@ -142,76 +155,94 @@ namespace SharpStrike
             switch (e.ByteBuffer.Code)
             {
                 case 1:
-                    player.SetPos(e.ByteBuffer.ReadFloat(), e.ByteBuffer.ReadFloat());
-                    player.Rotation = e.ByteBuffer.ReadFloat();
-
+                    UpdatePlayer(player, e.ByteBuffer);
                     break;
-
                 case 2:
-                    var pos = new Vector2(e.ByteBuffer.ReadFloat(), e.ByteBuffer.ReadFloat());
-                    var dir = new Vector2(e.ByteBuffer.ReadFloat(), e.ByteBuffer.ReadFloat());
-
-                    var hit = new List<Tuple<float, PlayerDummy>>();
-
-                    foreach (var playerDummy in _players.Values)
-                    {
-                        if (player == playerDummy)
-                            continue;
-
-                        if (RayHelper.Intersects(playerDummy.GetBoundingBox(), pos, dir, out var dist))
-                        {
-                            hit.Add(new Tuple<float, PlayerDummy>(dist, playerDummy));
-                        }
-                    }
-
-                    var damageToDeal = 35f;
-
-                    foreach (var tuple in hit.OrderBy(el => el.Item1))
-                    {
-                        tuple.Item2.Health -= damageToDeal;
-
-                        damageToDeal /= 2;
-                    }
-
-                    dir *= float.MaxValue;
-
-                    var payload = new ByteBufferWriter(e.ByteBuffer.Code);
-                    payload.WriteFloat(pos.X);
-                    payload.WriteFloat(pos.Y);
-                    payload.WriteFloat(dir.X);
-                    payload.WriteFloat(dir.Y);
-
-                    SendUDPMessageToAllExcept(player, payload);
-
+                    PlayerShot(player, e.ByteBuffer);
                     break;
             }
         }
 
-        private void SendUDPMessageToAllExcept(PlayerDummy except, ByteBufferWriter byteBuffer)
+        private void SendUdpMessageToAllExcept(PlayerDummy except, ByteBufferWriter byteBuffer)
         {
             foreach (var dummy in _players.Values)
             {
                 if (Equals(dummy, except))
                     continue;
 
-                SendUDPMessageTo(dummy, byteBuffer);
+                SendUdpMessageTo(dummy, byteBuffer);
             }
         }
 
-        private void SendUDPMessageTo(PlayerDummy to, ByteBufferWriter byteBuffer)
+        private void SendUdpMessageTo(PlayerDummy to, ByteBufferWriter byteBuffer)
         {
-            if (to.UDPLoaded)
-                _wrapperUDP.SendMessageTo(to.UDP, byteBuffer);
+            if (to.UdpLoaded)
+                _wrapperUdp.SendMessageTo(to.Udp, byteBuffer);
+        }
+
+        private void UpdatePlayer(PlayerDummy player, ByteBufferReader data)
+        {
+            player.SetPos(data.ReadVec2());
+            player.Rotation = data.ReadVec2();
+        }
+
+        private void PlayerShot(PlayerDummy player, ByteBufferReader data)
+        {
+            var pos = data.ReadVec2();
+            var dir = data.ReadVec2();
+
+            var hit = new List<Tuple<float, PlayerDummy>>();
+
+            foreach (var playerDummy in _players.Values)
+            {
+                if (player == playerDummy || playerDummy.Health <= 0)
+                    continue;
+
+                if (RayHelper.Intersects(playerDummy.GetBoundingBox(), pos, dir, out var dist))
+                {
+                    hit.Add(new Tuple<float, PlayerDummy>(dist, playerDummy));
+                }
+            }
+
+            var damageToDeal = 35f;
+
+            foreach (var tuple in hit.OrderBy(el => el.Item1))
+            {
+                var plr = tuple.Item2;
+
+                if (plr.Respawning)
+                    continue;
+
+                plr.Health -= damageToDeal;
+
+                if (plr.Health <= 0)
+                {
+                    plr.BeginRespawn();
+                }
+
+                damageToDeal /= 2;
+            }
+
+            dir *= float.MaxValue;
+
+            var payload = new ByteBufferWriter(data.Code);
+            payload.WriteVec2(pos);
+            payload.WriteVec2(dir);
+
+            SendUdpMessageToAllExcept(player, payload);
         }
 
         private class PlayerDummy
         {
-            public float X { get; private set; }
-            public float Y { get; private set; }
+            public Vector2 Pos { get; private set; }
 
-            public IPEndPoint UDP { get; private set; }
+            public IPEndPoint Udp { get; private set; }
+            public TcpClient Tcp { get; }
 
-            public bool UDPLoaded { get; private set; }
+            public bool UdpLoaded { get; private set; }
+
+            public bool NeedsRespawn;
+            public bool Respawning;
 
             public float Health
             {
@@ -219,46 +250,53 @@ namespace SharpStrike
                 set => _health = Math.Min(100, Math.Max(0, value));
             }
 
-            public float Rotation;
+            public Vector2 Rotation;
 
             private float _health = 100;
 
-            private AxisAlignedBB boundingBox, collisionBoundingBox;
+            private AxisAlignedBB _boundingBox, _collisionBoundingBox;
 
-            public PlayerDummy(float x, float y)
+            public PlayerDummy(TcpClient client, Vector2 pos = new Vector2())
             {
-                X = x;
-                Y = y;
+                Tcp = client;
 
-                var pos = new Vector2(x, y);
+                Pos = pos;
 
-                collisionBoundingBox = new AxisAlignedBB(25);
-
-                boundingBox = collisionBoundingBox.Offset(pos - Vector2.UnitX * collisionBoundingBox.size.X / 2 - Vector2.UnitY * collisionBoundingBox.size.Y / 2);
+                _collisionBoundingBox = new AxisAlignedBB(25);
+                _boundingBox = _collisionBoundingBox.Offset(Pos - Vector2.UnitX * _collisionBoundingBox.Size.X / 2 - Vector2.UnitY * _collisionBoundingBox.Size.Y / 2);
             }
 
-            public void SetPos(float x, float y)
+            public void BeginRespawn()
             {
-                X = x;
-                Y = y;
+                Respawning = true;
 
-                var pos = new Vector2(x, y);
+                Task.Run(async () =>
+                {
+                    await Task.Delay(3000);
 
-                boundingBox = collisionBoundingBox.Offset(pos - Vector2.UnitX * collisionBoundingBox.size.X / 2 - Vector2.UnitY * collisionBoundingBox.size.Y / 2);
+                    NeedsRespawn = true;
+                });
+            }
+
+            public void SetPos(Vector2 pos)
+            {
+                Pos = pos;
+
+                _boundingBox = _collisionBoundingBox.Offset(pos - Vector2.UnitX * _collisionBoundingBox.Size.X / 2 - Vector2.UnitY * _collisionBoundingBox.Size.Y / 2);
             }
 
             public AxisAlignedBB GetBoundingBox()
             {
-                return boundingBox;
+                return _boundingBox;
             }
 
-            public void SetUDP(IPEndPoint ipep)
+            public void SetUdp(IPEndPoint ipep)
             {
-                if (UDPLoaded)
+                if (UdpLoaded)
                     return;
 
-                UDP = ipep;
-                UDPLoaded = true;
+                Udp = ipep;
+                UdpLoaded = true;
             }
         }
     }

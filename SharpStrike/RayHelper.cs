@@ -11,7 +11,7 @@ namespace SharpStrike
             float maxValue = float.MaxValue;
             if (Math.Abs(dir.X) < 1E-06f)
             {
-                if (pos.X < box.min.X || pos.X > box.max.X)
+                if (pos.X < box.Min.X || pos.X > box.Max.X)
                 {
                     f = 0;
                     return false;
@@ -20,8 +20,8 @@ namespace SharpStrike
             else
             {
                 float num11 = 1f / dir.X;
-                float num8 = (box.min.X - pos.X) * num11;
-                float num7 = (box.max.X - pos.X) * num11;
+                float num8 = (box.Min.X - pos.X) * num11;
+                float num7 = (box.Max.X - pos.X) * num11;
                 if (num8 > num7)
                 {
                     float num14 = num8;
@@ -38,7 +38,7 @@ namespace SharpStrike
             }
             if (Math.Abs(dir.Y) < 1E-06f)
             {
-                if (pos.Y < box.min.Y || pos.Y > box.max.Y)
+                if (pos.Y < box.Min.Y || pos.Y > box.Max.Y)
                 {
                     f = 0;
                     return false;
@@ -47,8 +47,8 @@ namespace SharpStrike
             else
             {
                 float num10 = 1f / dir.Y;
-                float num6 = (box.min.Y - pos.Y) * num10;
-                float num5 = (box.max.Y - pos.Y) * num10;
+                float num6 = (box.Min.Y - pos.Y) * num10;
+                float num5 = (box.Max.Y - pos.Y) * num10;
                 if (num6 > num5)
                 {
                     float num13 = num6;

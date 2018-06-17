@@ -14,7 +14,7 @@ namespace SharpStrike
     {
         public static Game Instance;
 
-        private List<EntityFX> _effects = new List<EntityFX>();
+        private List<EntityFx> _effects = new List<EntityFx>();
 
         private readonly Stopwatch _updateTimer = new Stopwatch();
 
@@ -33,7 +33,7 @@ namespace SharpStrike
         public ClientHandler ClientHandler;
         private ServerHandler _server;
 
-        private float _tickrateRatio => 60 / (float)TargetUpdateFrequency;
+        private float TickrateRatio => 60 / (float)TargetUpdateFrequency;
 
         public float PartialTicks { get; private set; }
 
@@ -58,7 +58,7 @@ namespace SharpStrike
                 _server = new ServerHandler(port);
 
             ClientHandler = new ClientHandler(ip, port);
-            //ClientHandler.SendMessage(ProtocolType.Tcp, "connect", Player.pos.X.ToSafeString(), Player.pos.Y.ToSafeString());
+            //ClientHandler.SendMessage(ProtocolType.Tcp, "connect", Player.Pos.X.ToSafeString(), Player.Pos.Y.ToSafeString());
         }
 
         private void Init()
@@ -74,7 +74,7 @@ namespace SharpStrike
             Player = new EntityPlayer(50, 50, 40, Color.Red);
         }
 
-        public void SpawnEffect(EntityFX efx)
+        public void SpawnEffect(EntityFx efx)
         {
             _effects.Add(efx);
         }
@@ -156,10 +156,12 @@ namespace SharpStrike
 
         protected override void OnMouseMove(MouseMoveEventArgs e)
         {
-            if (!ClientRectangle.Contains(e.Position) || !Focused)
+            if (!ClientRectangle.Contains(e.Position))
                 return;
 
             MouseLast = e.Position;
+
+           // if (!Focused) //todo - other stuff
         }
 
         protected override void OnResize(EventArgs e)
@@ -216,14 +218,13 @@ namespace SharpStrike
                     dir.Normalize();
                     dir *= 3;
 
-                    Player.motion = dir * _tickrateRatio;
+                    Player.Motion = dir * TickrateRatio;
                 }
 
                 var payload = new ByteBufferWriter(1);
-                payload.WriteGuid(ClientHandler.ID);
-                payload.WriteFloat(Player.pos.X);
-                payload.WriteFloat(Player.pos.Y);
-                payload.WriteFloat(Player.Rotation);
+                payload.WriteGuid(ClientHandler.Id);
+                payload.WriteVec2(Player.Pos);
+                payload.WriteVec2(Player.Rotation);
 
                 ClientHandler.SendMessage(ProtocolType.Udp, payload);
             }

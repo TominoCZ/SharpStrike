@@ -7,15 +7,15 @@ using System.Threading.Tasks;
 
 namespace SharpStrike
 {
-    public class UDPWrapper
+    public class UdpWrapper
     {
         private ConcurrentQueue<Tuple<IPEndPoint, byte[]>> _messageQueue = new ConcurrentQueue<Tuple<IPEndPoint, byte[]>>();
 
         private UdpClient _client;
 
-        public EventHandler<UDPPacketEventArgs> OnReceivedMessage;
+        public EventHandler<UdpPacketEventArgs> OnReceivedMessage;
 
-        public UDPWrapper(UdpClient client, int port)
+        public UdpWrapper(UdpClient client, int port)
         {
             _client = client;
 
@@ -39,7 +39,7 @@ namespace SharpStrike
                         {
                             _messageQueue.TryDequeue(out var message);
 
-                            OnReceivedMessage?.Invoke(this, new UDPPacketEventArgs(message.Item1, new ByteBufferReader(message.Item2)));
+                            OnReceivedMessage?.Invoke(this, new UdpPacketEventArgs(message.Item1, new ByteBufferReader(message.Item2)));
                         }
                         else
                             Thread.Sleep(1);

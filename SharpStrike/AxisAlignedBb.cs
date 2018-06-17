@@ -5,13 +5,13 @@ namespace SharpStrike
 {
     public class AxisAlignedBB
     {
-        public static readonly AxisAlignedBB NULL = new AxisAlignedBB(Vector2.Zero, Vector2.Zero);
-        public readonly Vector2 min;
-        public readonly Vector2 max;
-        public readonly Vector2 corner1;
-        public readonly Vector2 corner2;
+        public static readonly AxisAlignedBB Null = new AxisAlignedBB(Vector2.Zero, Vector2.Zero);
+        public readonly Vector2 Min;
+        public readonly Vector2 Max;
+        public readonly Vector2 Corner1;
+        public readonly Vector2 Corner2;
 
-        public readonly Vector2 size;
+        public readonly Vector2 Size;
 
         public Vector2 this[int index]
         {
@@ -20,16 +20,16 @@ namespace SharpStrike
                 switch (index)
                 {
                     case 0:
-                        return min;
+                        return Min;
 
                     case 1:
-                        return corner1;
+                        return Corner1;
 
                     case 2:
-                        return max;
+                        return Max;
 
                     case 3:
-                        return corner2;
+                        return Corner2;
 
                     default:
                         throw new IndexOutOfRangeException();
@@ -47,11 +47,11 @@ namespace SharpStrike
 
         public AxisAlignedBB(Vector2 min, Vector2 max)
         {
-            corner1 = new Vector2(max.X, min.Y);
-            corner2 = new Vector2(min.X, max.Y);
+            Corner1 = new Vector2(max.X, min.Y);
+            Corner2 = new Vector2(min.X, max.Y);
 
-            this.min = min;
-            this.max = max;
+            this.Min = min;
+            this.Max = max;
 
             var minX = MathUtil.Min(min.X, max.X);
             var minY = MathUtil.Min(min.Y, max.Y);
@@ -62,7 +62,7 @@ namespace SharpStrike
             var v1 = new Vector2(minX, minY);
             var v2 = new Vector2(maxX, maxY);
 
-            size = v2 - v1;
+            Size = v2 - v1;
         }
 
         public AxisAlignedBB(float minX, float minY, float maxX, float maxY) : this(new Vector2(minX, minY), new Vector2(maxX, maxY))
@@ -71,41 +71,41 @@ namespace SharpStrike
 
         public AxisAlignedBB Offset(Vector2 by)
         {
-            return new AxisAlignedBB(min + by, max + by);
+            return new AxisAlignedBB(Min + by, Max + by);
         }
 
         public AxisAlignedBB Grow(Vector2 by)
         {
-            return new AxisAlignedBB(min + by / 2, max - by / 2);
+            return new AxisAlignedBB(Min + by / 2, Max - by / 2);
         }
 
         public AxisAlignedBB Union(AxisAlignedBB other)
         {
-            var minX = (int)Math.Floor(MathUtil.Min(min.X, max.X, other.min.X, other.max.X));
-            var minY = (int)Math.Floor(MathUtil.Min(min.Y, max.Y, other.min.Y, other.max.Y));
+            var minX = (int)Math.Floor(MathUtil.Min(Min.X, Max.X, other.Min.X, other.Max.X));
+            var minY = (int)Math.Floor(MathUtil.Min(Min.Y, Max.Y, other.Min.Y, other.Max.Y));
 
-            var maxX = (int)Math.Ceiling(MathUtil.Max(min.X, max.X, other.min.X, other.max.X));
-            var maxY = (int)Math.Ceiling(MathUtil.Max(min.Y, max.Y, other.min.Y, other.max.Y));
+            var maxX = (int)Math.Ceiling(MathUtil.Max(Min.X, Max.X, other.Min.X, other.Max.X));
+            var maxY = (int)Math.Ceiling(MathUtil.Max(Min.Y, Max.Y, other.Min.Y, other.Max.Y));
 
             return new AxisAlignedBB(minX, minY, maxX, maxY);
         }
 
         public float CalculateYOffset(AxisAlignedBB other, float offset)
         {
-            if (other.max.X > min.X && other.min.X < max.X)
+            if (other.Max.X > Min.X && other.Min.X < Max.X)
             {
-                if (offset > 0.0D && other.max.Y <= min.Y)
+                if (offset > 0.0D && other.Max.Y <= Min.Y)
                 {
-                    float d1 = min.Y - other.max.Y;
+                    float d1 = Min.Y - other.Max.Y;
 
                     if (d1 < offset)
                     {
                         offset = d1;
                     }
                 }
-                else if (offset < 0.0D && other.min.Y >= max.Y)
+                else if (offset < 0.0D && other.Min.Y >= Max.Y)
                 {
-                    float d0 = max.Y - other.min.Y;
+                    float d0 = Max.Y - other.Min.Y;
 
                     if (d0 > offset)
                     {
@@ -119,20 +119,20 @@ namespace SharpStrike
 
         public float CalculateXOffset(AxisAlignedBB other, float offset)
         {
-            if (other.max.Y > min.Y && other.min.Y < max.Y)
+            if (other.Max.Y > Min.Y && other.Min.Y < Max.Y)
             {
-                if (offset > 0.0D && other.max.X <= min.X)
+                if (offset > 0.0D && other.Max.X <= Min.X)
                 {
-                    float d1 = min.X - other.max.X;
+                    float d1 = Min.X - other.Max.X;
 
                     if (d1 < offset)
                     {
                         offset = d1;
                     }
                 }
-                else if (offset < 0.0D && other.min.X >= max.X)
+                else if (offset < 0.0D && other.Min.X >= Max.X)
                 {
-                    float d0 = max.X - other.min.X;
+                    float d0 = Max.X - other.Min.X;
 
                     if (d0 > offset)
                     {
@@ -146,13 +146,13 @@ namespace SharpStrike
 
         public Vector2 GetCenter()
         {
-            return (min + max) / 2;
+            return (Min + Max) / 2;
         }
 
         public bool IntersectsWith(AxisAlignedBB other)
         {
-            return min.X < other.max.X && max.X > other.min.X &&
-                   min.Y < other.max.Y && max.Y > other.min.Y;
+            return Min.X < other.Max.X && Max.X > other.Min.X &&
+                   Min.Y < other.Max.Y && Max.Y > other.Min.Y;
         }
     }
 }

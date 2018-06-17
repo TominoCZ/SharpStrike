@@ -28,9 +28,9 @@ namespace SharpStrike_Map_Editor
             for (var index = 0; index < _boxes.Count; index++)
             {
                 var box = _boxes[index];
-                var size = box.size;
+                var size = box.Size;
 
-                e.Graphics.DrawImage(_wall, box.min.X, box.min.Y, size.X, size.Y);
+                e.Graphics.DrawImage(_wall, box.Min.X, box.Min.Y, size.X, size.Y);
             }
         }
 
@@ -56,10 +56,10 @@ namespace SharpStrike_Map_Editor
                 {
                     var box = _boxes[count];
 
-                    floats.Add(box.min.X);
-                    floats.Add(box.min.Y);
-                    floats.Add(box.max.X);
-                    floats.Add(box.max.Y);
+                    floats.Add(box.Min.X);
+                    floats.Add(box.Min.Y);
+                    floats.Add(box.Max.X);
+                    floats.Add(box.Max.Y);
                 }
 
                 payload.WriteInt32(count);

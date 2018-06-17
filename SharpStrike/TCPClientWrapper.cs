@@ -7,15 +7,15 @@ using System.Threading.Tasks;
 
 namespace SharpStrike
 {
-    public class TCPClientWrapper
+    public class TcpClientWrapper
     {
         private ConcurrentQueue<byte[]> _messageQueue = new ConcurrentQueue<byte[]>();
 
         private TcpClient _client;
 
-        public EventHandler<TCPPacketEventArgs> OnReceivedMessage;
+        public EventHandler<TcpPacketEventArgs> OnReceivedMessage;
 
-        public TCPClientWrapper(TcpClient client)
+        public TcpClientWrapper(TcpClient client)
         {
             _client = client;
 
@@ -56,7 +56,7 @@ namespace SharpStrike
 
                             using (var pr = new ByteBufferReader(message))
                             {
-                                OnReceivedMessage?.Invoke(this, new TCPPacketEventArgs(null, pr));
+                                OnReceivedMessage?.Invoke(this, new TcpPacketEventArgs(null, pr));
                             }
                         }
                         else

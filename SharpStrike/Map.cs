@@ -21,7 +21,7 @@ namespace SharpStrike
             _collisionBoxes = boxes;
         }
 
-        public void SyncPlayers(List<Tuple<Guid, float, float, float, float>> data)
+        public void SyncPlayers(List<Tuple<Guid, Vector2, Vector2, float>> data)
         {
             foreach (var player in _players.Values)
             {
@@ -30,19 +30,27 @@ namespace SharpStrike
 
             foreach (var tuple in data)
             {
-                if (Equals(tuple.Item1, Game.Instance.ClientHandler.ID))
+                if (Equals(tuple.Item1, Game.Instance.ClientHandler.Id))
                 {
                     Game.Instance.Player.Health = tuple.Item4;
                     continue;
                 }
 
-                var ep = _players.GetOrAdd(tuple.Item1, new EntityPlayerRemote(tuple.Item2, tuple.Item3, 40));
-                ep.MoveTo(tuple.Item2, tuple.Item3);
+                var ep = _players.GetOrAdd(tuple.Item1, new EntityPlayerRemote(tuple.Item2, 40));
+                ep.MoveTo(tuple.Item2);
+                ep.Rotation = tuple.Item3;
                 ep.Health = tuple.Item4;
-                ep.Rotation = tuple.Item5;
             }
 
             _interpolationTimer.Restart();
+        }
+
+        public void RemovePlayer(Guid id)
+        {
+            if(_players.TryRemove(id, out var removed))
+            {
+                Console.WriteLine($"Player {id} has disconnected.");
+            }
         }
 
         public List<AxisAlignedBB> GetCollidingBoxes(AxisAlignedBB box)
@@ -66,13 +74,13 @@ namespace SharpStrike
                 var center = box.GetCenter();
 
                 GL.Translate(center.X, center.Y, 0);
-                GL.Scale(box.size.X, box.size.Y, 1);
+                GL.Scale(box.Size.X, box.Size.Y, 1);
 
                 GL.Begin(PrimitiveType.Quads);
                 VertexUtil.PutQuad();
                 GL.End();
 
-                GL.Scale(1 / box.size.X, 1 / box.size.Y, 1);
+                GL.Scale(1 / box.Size.X, 1 / box.Size.Y, 1);
                 GL.Translate(-center.X, -center.Y, 0);
             }
 

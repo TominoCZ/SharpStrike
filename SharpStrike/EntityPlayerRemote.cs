@@ -11,7 +11,8 @@ namespace SharpStrike
 
         public override bool IsAlive => Health > 0;
 
-        public float Rotation;
+        public Vector2 Rotation;
+        private Vector2 _lastRotation;
 
         public float Health
         {
@@ -19,17 +20,18 @@ namespace SharpStrike
             set => _health = Math.Min(100, Math.Max(0, value));
         }
 
-        public EntityPlayerRemote(float x, float y, float size) : base(new Vector2(x, y))
+        public EntityPlayerRemote(Vector2 pos, float size) : base(pos)
         {
             _size = size;
 
-            collisionBoundingBox = new AxisAlignedBB(size);
-            boundingBox = collisionBoundingBox.Offset(pos - (Vector2.UnitX * collisionBoundingBox.size.X / 2 + Vector2.UnitY * collisionBoundingBox.size.Y / 2));
+            CollisionBoundingBox = new AxisAlignedBB(size);
+            BoundingBox = CollisionBoundingBox.Offset(pos - (Vector2.UnitX * CollisionBoundingBox.Size.X / 2 + Vector2.UnitY * CollisionBoundingBox.Size.Y / 2));
         }
 
         public override void Update()
         {
-            lastPos = pos;
+            _lastRotation = Rotation;
+            LastPos = Pos;
         }
 
         public override void Move()
@@ -41,7 +43,13 @@ namespace SharpStrike
             if (!IsAlive)
                 return;
 
-            var partialPos = lastPos + (pos - lastPos) * partialTicks;
+            var partialPos = LastPos + (Pos - LastPos) * partialTicks;
+            var partialRotation = _lastRotation + (Rotation - _lastRotation) * partialTicks;
+
+            var ratio = partialRotation.X == 0 ? (partialRotation.Y > 0 ? 90 : -90) : partialRotation.Y / partialRotation.X;
+
+            var atan = Math.Atan(float.IsNaN(ratio) || float.IsInfinity(ratio) ? 0 : ratio);
+            var angle = 90 + (float)MathHelper.RadiansToDegrees(partialRotation.X < 0 ? atan + MathHelper.Pi : atan);
 
             GL.Color3(1, 1, 1f);
 
@@ -49,11 +57,11 @@ namespace SharpStrike
 
             GL.Translate(partialPos.X, partialPos.Y, 0);
             GL.Scale(_size, _size, 1);
-            GL.Rotate(Rotation, 0, 0, 1);
+            GL.Rotate(angle, 0, 0, 1);
             GL.Begin(PrimitiveType.Quads);
             VertexUtil.PutQuad();
             GL.End();
-            GL.Rotate(Rotation, 0, 0, -1);
+            GL.Rotate(angle, 0, 0, -1);
             GL.Scale(1 / _size, 1 / _size, 1);
             GL.Translate(-partialPos.X, -partialPos.Y, 0);
 

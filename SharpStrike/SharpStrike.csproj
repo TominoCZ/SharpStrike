@@ -48,7 +48,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AxisAlignedBb.cs" />
+    <Compile Include="AxisAlignedBB.cs" />
     <Compile Include="BulletTraceFX.cs" />
     <Compile Include="ClientHandler.cs" />
     <Compile Include="Entity.cs" />

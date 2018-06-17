@@ -11,23 +11,23 @@ namespace SharpStrike
     {
         private float _size;
         private bool _clickDelay;
-        private int delay = 100;
+        private int _delay = 100;
         private bool _shooting;
 
         public float Health = 100;
 
-        public float Rotation { get; private set; }
+        public Vector2 Rotation;
 
         public override bool IsAlive => Health > 0;
 
-        public Vector2 PartialPos => lastPos + (pos - lastPos) * Game.Instance.PartialTicks;
+        public Vector2 PartialPos => LastPos + (Pos - LastPos) * Game.Instance.PartialTicks;
 
         public EntityPlayer(float x, float y, float size, Color color) : base(new Vector2(x, y))
         {
             _size = size;
 
-            collisionBoundingBox = new AxisAlignedBB(size);
-            boundingBox = collisionBoundingBox.Offset(pos - (Vector2.UnitX * collisionBoundingBox.size.X / 2 + Vector2.UnitY * collisionBoundingBox.size.Y / 2));
+            CollisionBoundingBox = new AxisAlignedBB(size);
+            BoundingBox = CollisionBoundingBox.Offset(Pos - (Vector2.UnitX * CollisionBoundingBox.Size.X / 2 + Vector2.UnitY * CollisionBoundingBox.Size.Y / 2));
         }
 
         public override void Update()
@@ -43,7 +43,7 @@ namespace SharpStrike
             if (!IsAlive)
                 return;
 
-            var partialPos = lastPos + (pos - lastPos) * partialTicks;
+            var partialPos = LastPos + (Pos - LastPos) * partialTicks;
 
             GL.Color3(1, 1, 1f);
 
@@ -52,17 +52,20 @@ namespace SharpStrike
             var x = Game.Instance.MouseLast.X - Game.Instance.Width / 2f;
             var y = Game.Instance.MouseLast.Y - Game.Instance.Height / 2f;
 
-            Rotation = 90 + (float)MathHelper.RadiansToDegrees(x < 0
-                        ? Math.Atan(y / x) + MathHelper.Pi
-                        : Math.Atan(y / x));
+            Rotation = Vector2.Normalize(new Vector2(x, y));
+
+            var ratio = Rotation.X == 0 ? (Rotation.Y > 0 ? 90 : -90) : Rotation.Y / Rotation.X;
+
+            var atan = Math.Atan(float.IsNaN(ratio) || float.IsInfinity(ratio) ? 0 : ratio);
+            var angle = 90 + (float)MathHelper.RadiansToDegrees(Rotation.X < 0 ? atan + MathHelper.Pi : atan);
 
             GL.Translate(partialPos.X, partialPos.Y, 0);
             GL.Scale(_size, _size, 1);
-            GL.Rotate(Rotation, 0, 0, 1);
+            GL.Rotate(angle, 0, 0, 1);
             GL.Begin(PrimitiveType.Quads);
             VertexUtil.PutQuad();
             GL.End();
-            GL.Rotate(-Rotation, 0, 0, 1);
+            GL.Rotate(angle, 0, 0, -1);
             GL.Scale(1 / _size, 1 / _size, 1);
             GL.Translate(-partialPos.X, -partialPos.Y, 0);
 
@@ -93,7 +96,7 @@ namespace SharpStrike
 
             Task.Run(async () =>
             {
-                await Task.Delay(delay);
+                await Task.Delay(_delay);
 
                 _clickDelay = false;
             });
@@ -105,15 +108,13 @@ namespace SharpStrike
             var landed = Game.Instance.Map.GetShotLandedPosition(vec, dir); //for clientside purposes
 
             var payload = new ByteBufferWriter(2);
-            payload.WriteGuid(Game.Instance.ClientHandler.ID);
-            payload.WriteFloat(vec.X);
-            payload.WriteFloat(vec.Y);
-            payload.WriteFloat(dir.X);
-            payload.WriteFloat(dir.Y);
+            payload.WriteGuid(Game.Instance.ClientHandler.Id);
+            payload.WriteVec2(vec);
+            payload.WriteVec2(dir);
 
             Game.Instance.ClientHandler.SendMessage(ProtocolType.Udp, payload);
 
-            Game.Instance.SpawnEffect(new BulletTraceFX(PartialPos, landed, 3));
+            Game.Instance.SpawnEffect(new BulletTraceFx(PartialPos, landed, 3));
         }
     }
 }

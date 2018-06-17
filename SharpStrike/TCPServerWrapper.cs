@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace SharpStrike
 {
-    public class TCPServerWrapper
+    public class TcpServerWrapper
     {
         private ConcurrentQueue<Tuple<TcpClient, byte[]>> _messageQueue =
             new ConcurrentQueue<Tuple<TcpClient, byte[]>>();
@@ -17,10 +17,10 @@ namespace SharpStrike
 
         private TcpListener _server;
 
-        public EventHandler<TCPPacketEventArgs> OnReceivedMessage;
+        public EventHandler<TcpPacketEventArgs> OnReceivedMessage;
         public EventHandler<TcpClient> OnClientConnected;
 
-        public TCPServerWrapper(TcpListener server)
+        public TcpServerWrapper(TcpListener server)
         {
             _server = server;
 
@@ -29,7 +29,7 @@ namespace SharpStrike
                 while (true)
                 {
                     var client = _server.AcceptTcpClient();
-
+                    
                     _connected.TryAdd(client, client.GetStream());
 
                     OnClientConnected?.Invoke(this, client);
@@ -42,6 +42,9 @@ namespace SharpStrike
                 {
                     foreach (var pair in _connected)
                     {
+                        if (!pair.Key.Connected)
+                            _connected.TryRemove(pair.Key, out var removed);
+
                         if (pair.Value.DataAvailable)
                         {
                             using (var sr = new BinaryReader(pair.Value))
@@ -63,7 +66,7 @@ namespace SharpStrike
 
                             var payload = new ByteBufferReader(message.Item2);
 
-                            OnReceivedMessage?.Invoke(this, new TCPPacketEventArgs(message.Item1, payload));
+                            OnReceivedMessage?.Invoke(this, new TcpPacketEventArgs(message.Item1, payload));
                         }
                         else
                             Thread.Sleep(1);
@@ -81,8 +84,10 @@ namespace SharpStrike
         {
             var bytes = byteBuffer.ToArray();
 
-            if (_connected.TryGetValue(to, out var tcp))
-                tcp.Write(bytes, 0, bytes.Length);
+            if (_connected.TryGetValue(to, out var stream))
+            {
+                to.GetStream().Write(bytes, 0, bytes.Length);
+            }
         }
     }
 }

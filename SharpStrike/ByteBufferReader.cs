@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using OpenTK;
 
 namespace SharpStrike
 {
@@ -28,9 +29,19 @@ namespace SharpStrike
             return _reader.ReadSingle();
         }
 
+        public Vector2 ReadVec2()
+        {
+            return new Vector2(ReadFloat(), ReadFloat());
+        }
+
         public string ReadString()
         {
             return _reader.ReadString();
+        }
+
+        public bool ReadBoolean()
+        {
+            return _reader.ReadBoolean();
         }
 
         public Guid ReadGuid()

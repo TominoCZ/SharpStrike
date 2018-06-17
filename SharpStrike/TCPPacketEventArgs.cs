@@ -2,11 +2,11 @@
 
 namespace SharpStrike
 {
-    public class TCPPacketEventArgs : PacketEventArgs
+    public class TcpPacketEventArgs : PacketEventArgs
     {
         public TcpClient From { get; }
 
-        public TCPPacketEventArgs(TcpClient from, ByteBufferReader byteBuffer) : base(byteBuffer)
+        public TcpPacketEventArgs(TcpClient from, ByteBufferReader byteBuffer) : base(byteBuffer)
         {
             From = from;
         }
